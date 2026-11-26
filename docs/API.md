@@ -4,7 +4,7 @@ Base URL: `http://localhost:8000`
 
 ## Health and demo
 - `GET /health` — service health.
-- `GET /v1/demo/overview` — bundled synthetic experiment aggregated by date, creative, and funnel stage. Includes seeded demo workspace/product IDs.
+- `GET /v1/demo/overview` — bundled synthetic experiment aggregated by date, creative, and funnel stage. Includes seeded demo workspace/product IDs.\n- `GET /v1/demo/experiment/compare?control_family=C-A&treatment_family=C-B&metric=CTR&mde_absolute=0.005` — synthetic creative-family comparison with two-proportion z-test, Wilson intervals, sample sufficiency and approximate sample planning.
 
 ## Persistent workspace APIs
 
@@ -48,7 +48,7 @@ Metric semantics:
 - AOV = attributed revenue / purchases
 - ROAS = attributed revenue / spend
 
-Zero denominator returns null. ROAS is not ROI.
+Zero denominator returns null. ROAS is not ROI.\n\n## Experiment statistics\n\nThe comparison endpoint supports CTR (clicks / impressions) and click-to-purchase CVR (purchases / clicks). It returns arm-level Wilson 95% intervals, an absolute difference interval, relative lift, z-score, two-sided p-value, a minimum-sample decision label, and an approximate equal-allocation sample estimate for 80% power at 5% alpha when an MDE is supplied.\n\nThe implementation is a two-proportion z-test over aggregate counts. It assumes independent binary outcomes and is only a statistical workflow demonstration on the bundled synthetic dataset. It does not correct for multiple comparisons, repeated peeking, cluster effects, or platform delivery bias. Do not use it to declare real campaign winners without randomized assignment and a pre-registered analysis plan.
 
 ## Creative Strategy Agent configuration
 
