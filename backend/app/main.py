@@ -6,6 +6,7 @@ import os
 import json
 import sqlite3
 import uuid
+from time import perf_counter
 from typing import Literal
 from pathlib import Path
 
@@ -15,7 +16,8 @@ from pydantic import BaseModel, Field, ConfigDict
 
 from .metrics import MetricRow, aggregate_metrics
 from . import storage
-from .schemas import (WorkspaceCreate, ProductCreate, ClaimCreate, CreativeCreate, AssetVersionCreate, AssetReviewCreate, ExperimentCreate, VariantCreate)
+from .schemas import (WorkspaceCreate, ProductCreate, ClaimCreate, CreativeCreate, AssetVersionCreate, AssetReviewCreate, ExperimentCreate, VariantCreate, StrategyRunRequest)
+from .agents import generate_creative_strategy
 
 app = FastAPI(title="AI Ads Growth Lab API", version="0.4.0")
 storage.init_db()
@@ -428,5 +430,112 @@ def list_asset_reviews(asset_version_id: str):
         for row in rows:
             result = dict(row)
             result["findings"] = json.loads(result.pop("findings_json"))
+            results.append(result)
+        return results
+
+
+@app.post("/v1/agents/creative-strategy/run", status_code=201)
+async def run_creative_strategy_agent(payload: StrategyRunRequest):
+    run_id = str(uuid.uuid4())
+    with storage.connect() as db:
+        workspace = db.execute("SELECT * FROM workspace WHERE id=?", (payload.workspace_id,)).fetchone()
+        product = db.execute("SELECT * FROM product WHERE id=?", (payload.product_id,)).fetchone()
+        if not workspace:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        if product["workspace_id"] != payload.workspace_id:
+            raise HTTPException(status_code=422, detail="Product does not belong to the supplied workspace")
+        verified_claim_rows = db.execute(
+            "SELECT id,claim_text,claim_type,evidence_refs_json FROM claim WHERE product_id=? AND status='VERIFIED'",
+            (payload.product_id,),
+        ).fetchall()
+        verified_claims = [{
+            "id": row["id"], "claim_text": row["claim_text"], "claim_type": row["claim_type"],
+            "evidence_refs": json.loads(row["evidence_refs_json"])
+        } for row in verified_claim_rows]
+        product_data = {
+            "id": product["id"], "name": product["name"], "category": product["category"],
+            "currency": product["currency"], "price_cents": product["price_cents"],
+            "facts": json.loads(product["facts_json"]),
+        }
+        input_refs = {
+            "workspace_id": payload.workspace_id, "product_id": payload.product_id,
+            "audience_hypothesis": payload.audience_hypothesis,
+            "campaign_objective": payload.campaign_objective,
+            "concept_count": payload.concept_count, "verified_claim_ids": [item["id"] for item in verified_claims]
+        }
+        db.execute(
+            "INSERT INTO agent_run(id,workspace_id,agent_name,status,input_refs_json) VALUES(?,?,?,?,?)",
+            (run_id, payload.workspace_id, "creative_strategy", "RUNNING", json.dumps(input_refs, ensure_ascii=False)),
+        )
+        storage.audit(db, payload.workspace_id, "RUN", "AGENT", run_id, {"agent_name":"creative_strategy"})
+
+    started = perf_counter()
+    try:
+        output, model_name = await generate_creative_strategy(
+            product=product_data, verified_claims=verified_claims,
+            audience_hypothesis=payload.audience_hypothesis,
+            campaign_objective=payload.campaign_objective,
+            concept_count=payload.concept_count, language=payload.language,
+        )
+    except RuntimeError as exc:
+        latency_ms = int((perf_counter() - started) * 1000)
+        with storage.connect() as db:
+            db.execute("UPDATE agent_run SET status='FAILED',error=?,latency_ms=? WHERE id=?",
+                       (str(exc), latency_ms, run_id))
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        latency_ms = int((perf_counter() - started) * 1000)
+        with storage.connect() as db:
+            db.execute("UPDATE agent_run SET status='FAILED',error=?,latency_ms=? WHERE id=?",
+                       (str(exc), latency_ms, run_id))
+        raise HTTPException(status_code=502, detail=f"Creative strategy provider failed: {exc}") from exc
+
+    saved = []
+    with storage.connect() as db:
+        for concept in output.concepts:
+            creative_id = str(uuid.uuid4())
+            db.execute(
+                "INSERT INTO creative(id,workspace_id,product_id,concept_name,angle,hook,narrative,cta,language,format,hypothesis,claims_used_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                (creative_id, payload.workspace_id, payload.product_id, concept.concept_name, concept.angle,
+                 concept.hook, concept.narrative, concept.cta, payload.language, concept.format,
+                 concept.hypothesis, json.dumps(concept.claims_used)),
+            )
+            saved.append({
+                "id": creative_id, **concept.model_dump(),
+                "language": payload.language, "status": "DRAFT_REQUIRES_REVIEW"
+            })
+        latency_ms = int((perf_counter() - started) * 1000)
+        output_refs = {"creative_ids": [item["id"] for item in saved], "concept_count": len(saved)}
+        db.execute(
+            "UPDATE agent_run SET status='SUCCEEDED',model_name=?,output_refs_json=?,latency_ms=? WHERE id=?",
+            (model_name, json.dumps(output_refs, ensure_ascii=False), latency_ms, run_id),
+        )
+        storage.audit(db, payload.workspace_id, "COMPLETE", "AGENT", run_id, output_refs)
+
+    return {
+        "run_id": run_id, "agent_name": "creative_strategy", "status": "SUCCEEDED",
+        "model": model_name, "latency_ms": latency_ms, "data_mode": workspace["data_mode"],
+        "verified_claims_available": len(verified_claims), "concepts": saved,
+        "limitations": [
+            "Generated concepts are drafts and require human creative and compliance review.",
+            "No ad assets are generated by this strategy endpoint.",
+            "No campaign is published and no budget is spent."
+        ]
+    }
+
+
+@app.get("/v1/workspaces/{workspace_id}/agent-runs")
+def list_agent_runs(workspace_id: str):
+    with storage.connect() as db:
+        if not db.execute("SELECT 1 FROM workspace WHERE id=?", (workspace_id,)).fetchone():
+            raise HTTPException(status_code=404, detail="Workspace not found")
+        rows = db.execute("SELECT * FROM agent_run WHERE workspace_id=? ORDER BY created_at DESC LIMIT 100", (workspace_id,))
+        results = []
+        for row in rows:
+            result = dict(row)
+            result["input_refs"] = json.loads(result.pop("input_refs_json"))
+            result["output_refs"] = json.loads(result.pop("output_refs_json"))
             results.append(result)
         return results
