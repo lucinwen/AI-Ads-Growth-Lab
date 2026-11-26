@@ -8,7 +8,7 @@ AI-powered creative production and growth analytics workspace for the US beauty 
 
 ### Implemented
 - Responsive React + TypeScript dashboard with Overview, Creative Studio, Experiments, Growth Insights, and Agent Activity views.
-- FastAPI health, deterministic metric aggregation, CSV validation, and demo overview endpoints.
+- FastAPI health, deterministic metric aggregation, CSV validation, demo overview, and persistent workspace APIs.\n- SQLite local persistence for workspaces, products, claims, creatives, asset versions, experiments, variants, and audit events.\n- Idempotently seeded fictional Luma Dew demo workspace; Creative Studio saves new hypotheses to the database.
 - Demo overview aggregation by creative, date, and funnel stage.
 - Explicit SIMULATED / REAL data-mode isolation in aggregation and CSV validation.
 - 84 synthetic daily records covering 12 creative variants across 7 dates.
