@@ -43,7 +43,9 @@
 - [x] Experiment builder persists experiment definitions and assigns creative variants
 - [x] Asset version records start PENDING and require a separate human review action
 - [ ] Full creative brief editor with product facts and audience hypothesis
-- [ ] Script / storyboard / prompt editor with version history
+- [x] Creative Production Agent generates structured scripts, storyboards, camera directions and asset prompts
+- [x] Production brief versions persist per creative and are visible in Creative Studio
+- [ ] Editable script / storyboard / prompt editor with version history
 - [ ] Asset upload, storage, preview, and version comparison
 - [ ] Compliance precheck linked to Claim Registry; block high-risk creative before READY_TO_TEST
 
