@@ -81,3 +81,12 @@ class VariantCreate(StrictModel):
     creative_id: str
     allocation_pct: float = Field(gt=0, le=100)
     role: Literal["CONTROL", "TREATMENT"] = "TREATMENT"
+
+
+class StrategyRunRequest(StrictModel):
+    workspace_id: str
+    product_id: str
+    audience_hypothesis: str = Field(min_length=10, max_length=1000)
+    campaign_objective: Literal["AWARENESS", "TRAFFIC", "CONVERSION", "CONSIDERATION"] = "CONVERSION"
+    concept_count: int = Field(default=4, ge=2, le=8)
+    language: str = "en-US"
