@@ -22,13 +22,17 @@
 - [ ] Browser-level visual QA and responsive screenshots
 
 ## P2 — Persistent product data
-- [ ] PostgreSQL connection, migrations, and seed process
-- [ ] Workspace / Brand / Product / Claim models and CRUD APIs
-- [ ] Creative / AssetVersion / Experiment / Variant models and CRUD APIs
-- [ ] Claim evidence registry and reviewer workflow
-- [ ] Asset manifests, version lineage, and rights metadata
-- [ ] Audit log and persisted AgentRun trace model
-- [ ] Import batch persistence, deduplication, and validation report history
+- [x] SQLite local persistence layer and idempotent demo seed
+- [x] Workspace / Product / Claim / Creative CRUD APIs
+- [x] AssetVersion / Experiment / Variant CRUD APIs
+- [x] Verified claim requires evidence reference
+- [x] Workspace ownership checks for products, creatives and experiment variants
+- [x] Audit log for create and variant operations
+- [ ] PostgreSQL connection and migrations (SQLite is current local runtime)
+- [ ] Claim reviewer identity, timestamp and full review history
+- [ ] Asset rights manifest and immutable approval transitions
+- [ ] Import batch persistence, deduplication and validation report history
+- [ ] Persisted AgentRun trace model
 
 ## P3 — Functional creative workspace
 - [ ] Creative brief editor with product facts and audience hypothesis
