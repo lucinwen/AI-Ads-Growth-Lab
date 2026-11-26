@@ -19,6 +19,7 @@ from .schemas import (WorkspaceCreate, ProductCreate, ClaimCreate, CreativeCreat
 
 app = FastAPI(title="AI Ads Growth Lab API", version="0.4.0")
 storage.init_db()
+storage.seed_demo_workspace()
 
 @app.on_event("startup")
 def initialize_storage():
@@ -184,6 +185,8 @@ def demo_overview():
         ]
         return {
             "experiment_id": "EXP-US-BEAUTY-001",
+            "workspace_id": "demo-us-beauty-workspace",
+            "product_id": "demo-luma-dew-moisturizer",
             "workspace": "Luma Dew / US Beauty Demo",
             "data_mode": "SIMULATED",
             "source": "bundled_synthetic_dataset",
