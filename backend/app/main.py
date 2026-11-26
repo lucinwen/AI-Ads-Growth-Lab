@@ -4,6 +4,7 @@ import csv
 import io
 import os
 import json
+import re
 from math import isfinite
 import sqlite3
 import zipfile
