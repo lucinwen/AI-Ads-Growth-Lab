@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field, ConfigDict
 
 from .metrics import MetricRow, aggregate_metrics
 from . import storage
-from .schemas import (WorkspaceCreate, ProductCreate, ClaimCreate, CreativeCreate, AssetVersionCreate, ExperimentCreate, VariantCreate)
+from .schemas import (WorkspaceCreate, ProductCreate, ClaimCreate, CreativeCreate, AssetVersionCreate, AssetReviewCreate, ExperimentCreate, VariantCreate)
 
 app = FastAPI(title="AI Ads Growth Lab API", version="0.4.0")
 storage.init_db()
@@ -317,7 +317,7 @@ def create_asset_version(payload: AssetVersionCreate):
         db.execute(
             "INSERT INTO asset_version(id,creative_id,version_no,asset_type,asset_uri,prompt_text,model_name,file_hash,approval_status) VALUES(?,?,?,?,?,?,?,?,?)",
             (asset_id, payload.creative_id, version_no, payload.asset_type, payload.asset_uri, payload.prompt_text,
-             payload.model_name, payload.file_hash, payload.approval_status),
+             payload.model_name, payload.file_hash, "PENDING"),
         )
         storage.audit(db, creative["workspace_id"], "CREATE_VERSION", "ASSET_VERSION", asset_id, {"version_no": version_no})
         return dict(db.execute("SELECT * FROM asset_version WHERE id=?", (asset_id,)).fetchone())
@@ -391,3 +391,41 @@ def list_audit_log(workspace_id: str):
         if not db.execute("SELECT 1 FROM workspace WHERE id=?", (workspace_id,)).fetchone():
             raise HTTPException(status_code=404, detail="Workspace not found")
         return [storage.row_dict(row) for row in db.execute("SELECT * FROM audit_log WHERE workspace_id=? ORDER BY id DESC LIMIT 200", (workspace_id,))]
+
+
+@app.post("/v1/assets/versions/{asset_version_id}/review", status_code=201)
+def review_asset_version(asset_version_id: str, payload: AssetReviewCreate):
+    review_id = str(uuid.uuid4())
+    with storage.connect() as db:
+        asset = db.execute(
+            "SELECT av.id, c.workspace_id FROM asset_version av JOIN creative c ON c.id=av.creative_id WHERE av.id=?",
+            (asset_version_id,),
+        ).fetchone()
+        if not asset:
+            raise HTTPException(status_code=404, detail="Asset version not found")
+        db.execute(
+            "INSERT INTO review_record(id,asset_version_id,reviewer_id,decision,reason,findings_json) VALUES(?,?,?,?,?,?)",
+            (review_id, asset_version_id, payload.reviewer_id, payload.decision, payload.reason,
+             json.dumps(payload.findings, ensure_ascii=False)),
+        )
+        db.execute("UPDATE asset_version SET approval_status=? WHERE id=?", (payload.decision, asset_version_id))
+        storage.audit(db, asset["workspace_id"], "REVIEW", "ASSET_VERSION", asset_version_id,
+                      {"reviewer_id": payload.reviewer_id, "decision": payload.decision})
+        row = db.execute("SELECT * FROM review_record WHERE id=?", (review_id,)).fetchone()
+        result = dict(row)
+        result["findings"] = json.loads(result.pop("findings_json"))
+        return result
+
+
+@app.get("/v1/assets/versions/{asset_version_id}/reviews")
+def list_asset_reviews(asset_version_id: str):
+    with storage.connect() as db:
+        if not db.execute("SELECT 1 FROM asset_version WHERE id=?", (asset_version_id,)).fetchone():
+            raise HTTPException(status_code=404, detail="Asset version not found")
+        rows = db.execute("SELECT * FROM review_record WHERE asset_version_id=? ORDER BY created_at DESC", (asset_version_id,))
+        results = []
+        for row in rows:
+            result = dict(row)
+            result["findings"] = json.loads(result.pop("findings_json"))
+            results.append(result)
+        return results
