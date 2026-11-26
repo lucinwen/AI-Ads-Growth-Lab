@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
+from math import isfinite
 from typing import Iterable, Optional
 
 
@@ -44,6 +45,8 @@ def aggregate_metrics(rows: Iterable[MetricRow]) -> dict:
             value = getattr(row, field)
             if not isinstance(value, int) or value < 0:
                 raise ValueError(f"{field} must be a non-negative integer")
+        if not isfinite(row.spend_usd) or not isfinite(row.attributed_revenue_usd):
+            raise ValueError("Spend and attributed revenue must be finite numbers")
         if row.spend_usd < 0 or row.attributed_revenue_usd < 0:
             raise ValueError("Spend and attributed revenue must be non-negative")
 
