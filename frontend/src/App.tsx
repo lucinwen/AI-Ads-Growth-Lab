@@ -215,6 +215,29 @@ function CreativePage({drafts,setDrafts,newHook,setNewHook,notify,workspaceId,pr
   drafts:{id:string;title:string;angle:string;hook:string;hypothesis:string;format:string;status:string}[];
   setDrafts:(v:any)=>void;newHook:string;setNewHook:(v:string)=>void;notify:(s:string)=>void;workspaceId:string;productId:string;
 }) {
+  const [claims,setClaims] = useState<any[]>([]);
+  const [claimText,setClaimText] = useState("");
+  const [claimType,setClaimType] = useState("product_attribute");
+  const [claimMessage,setClaimMessage] = useState("");
+  useEffect(() => {
+    if (!productId) return;
+    fetch(`${API}/v1/products/${productId}/claims`)
+      .then(r=>{if(!r.ok)throw new Error("Could not load product claims");return r.json();})
+      .then(setClaims)
+      .catch(err=>setClaimMessage(String(err.message||err)));
+  },[productId]);
+  async function saveClaim() {
+    if(!claimText.trim()||!productId)return;
+    try {
+      const response=await fetch(`${API}/v1/claims`,{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({product_id:productId,claim_text:claimText.trim(),claim_type:claimType,status:"UNVERIFIED",evidence_refs:[],risk_level:"MEDIUM"})
+      });
+      const row=await response.json();
+      if(!response.ok)throw new Error(row.detail||"Could not save claim");
+      setClaims(old=>[row,...old]);setClaimText("");setClaimMessage("Claim saved as UNVERIFIED. Attach substantiation before use in ad copy.");
+    }catch(err){setClaimMessage(String((err as Error).message||err));}
+  }
   async function saveCreativeDraft() {
     if (!newHook.trim() || !workspaceId || !productId) return;
     try {
@@ -242,6 +265,12 @@ function CreativePage({drafts,setDrafts,newHook,setNewHook,notify,workspaceId,pr
     <SectionTitle title="Creative routes" desc="Four differentiated directions for the fictional Luma Dew moisturizer." action={<Pill tone="green">4 concepts</Pill>}/>
     <div className="concept-grid">{drafts.map((d,i)=><div className="concept-card" key={d.id}><div className="concept-top"><span className={`concept-number n-${i}`}>0{i+1}</span><Pill tone={d.status.includes("Needs")?"amber":"neutral"}>{d.status}</Pill></div><div className={`concept-art art-${i}`}><div className="art-bottle"/><span>{["DAILY RITUAL","TEXTURE NOTES","FORMULA / FACTS","REAL-LIFE ROUTINE"][i]}</span></div><div className="concept-body"><span className="concept-angle">{d.angle}</span><h3>{d.title}</h3><blockquote>“{d.hook}”</blockquote><p>{d.hypothesis}</p><div className="concept-foot"><span><Image size={14}/>{d.format}</span><button onClick={()=>notify("Concept detail editor is queued for the next milestone.")}>View brief <ArrowUpRight size={14}/></button></div></div></div>)}</div>
     <div className="panel quick-draft"><div><h3><Plus size={17}/> Add a creative hypothesis</h3><p>Save a new hook as a local draft. This does not call a generation model.</p></div><div className="draft-form"><input value={newHook} onChange={e=>setNewHook(e.target.value)} placeholder="Write an English hook or creative angle…"/><button className="button button-primary" disabled={!newHook.trim() || !workspaceId} onClick={saveCreativeDraft}><Plus size={15}/> Save draft</button></div></div>
+    <div className="panel claim-panel">
+      <div className="panel-head"><div><h3>Product claim registry</h3><p>Only evidence-backed claims may move into approved ad copy.</p></div><Pill tone="amber">Evidence gate</Pill></div>
+      <div className="claim-form"><input value={claimText} onChange={e=>setClaimText(e.target.value)} placeholder="Add a product statement to review…"/><select value={claimType} onChange={e=>setClaimType(e.target.value)}><option value="product_attribute">Product attribute</option><option value="sensory">Sensory / feel</option><option value="performance">Performance</option><option value="clinical">Clinical / therapeutic</option></select><button className="button button-primary" disabled={!claimText.trim()} onClick={saveClaim}><Plus size={14}/> Add unverified claim</button></div>
+      {claimMessage&&<div className="import-result">{claimMessage}</div>}
+      <div className="claim-list">{claims.length?claims.map((claim:any)=><div className="claim-row" key={claim.id}><div><strong>{claim.claim_text}</strong><span>{claim.claim_type} · risk {claim.risk_level}</span></div><Pill tone={claim.status==="VERIFIED"?"green":"amber"}>{claim.status}</Pill></div>):<div className="empty-state-inline">No product claims registered yet.</div>}</div>
+    </div>
     <div className="compliance-inline"><ShieldCheck size={17}/><div><strong>Claim evidence gate</strong><span>“Clinically proven”, acne-treatment and unsupported before/after claims remain blocked until evidence and regulatory review are attached.</span></div><Pill tone="amber">Human review required</Pill></div>
   </div>;
 }
