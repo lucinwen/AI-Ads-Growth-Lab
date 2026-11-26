@@ -17,7 +17,7 @@ AI-powered creative production and growth analytics workspace for the US beauty 
 ## Current implementation status
 
 **Implemented in the first backend slice**
-- FastAPI health endpoint
+- FastAPI health endpoint\n- Demo overview endpoint aggregating the bundled dataset by date, creative and funnel stage\n- CORS configured for the local Vite frontend
 - Deterministic metric aggregation endpoint
 - CSV validation endpoint with data-mode isolation
 - Metric engine and API smoke tests
@@ -25,14 +25,14 @@ AI-powered creative production and growth analytics workspace for the US beauty 
 - Initial PRD, experiment plan, data dictionary, build plan, Agent Skills, and PostgreSQL schema
 
 **Not implemented yet**
-- Next.js frontend
+- Persistent database integration/migrations
 - Persistent database integration/migrations
 - LLM-backed Agent execution
 - Asset upload/storage UI
-- Experiment management UI and charts
+- Persistent experiment management and LLM-backed Agent execution\n- TikTok/Meta read-only connectors
 - TikTok/Meta read-only connectors
 
-## Quick start — local API
+## Quick start — full local application\n\nRequires Docker Compose, or Python 3.11+ and Node.js 20+.\n\n### Docker Compose (recommended)\n\n\\`\\`\\`bash\ndocker compose up --build\n\\`\\`\\`\n\nOpen the frontend at http://localhost:5173 and API docs at http://localhost:8000/docs.\n\n### Run frontend and API separately\n\nStart the API using the steps below, then in another terminal:\n\n\\`\\`\\`bash\ncd frontend\nnpm install\nnpm run dev\n\\`\\`\\`\n\n## Quick start — API only
 
 Requires Python 3.11+.
 
@@ -68,7 +68,7 @@ docker compose up --build
 
 - `GET /health`
 - `POST /v1/metrics/aggregate` — aggregate validated metric rows
-- `POST /v1/import/csv/validate?data_mode=SIMULATED` — validate a CSV upload and return aggregate metrics
+- `POST /v1/import/csv/validate?data_mode=SIMULATED` — validate a CSV upload and return aggregate metrics\n- `GET /v1/demo/overview` — aggregated demo data for dashboard views
 
 Example aggregate request:
 
@@ -109,7 +109,7 @@ Example aggregate request:
 ## Repository map
 
 - `docs/` — PRD, experiment design, data dictionary, portfolio criteria
-- `backend/` — API, deterministic metric engine, tests
+- `backend/` — API, deterministic metric engine, tests\n- `frontend/` — responsive React + TypeScript workspace dashboard
 - `data/` — explicitly synthetic demo data
 - `skills/` — specialist Agent instructions
 - `schemas/` — PostgreSQL schema
