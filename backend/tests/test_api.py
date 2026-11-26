@@ -164,3 +164,30 @@ def test_experiment_data_mode_must_match_workspace():
         "channel": "TikTok", "data_mode": "REAL"
     })
     assert response.status_code == 422
+
+
+def test_asset_version_requires_separate_human_review():
+    workspace = client.post("/v1/workspaces", json={"name":"Asset Review Test","market":"US","data_mode":"SIMULATED"}).json()
+    product = client.post("/v1/products", json={"workspace_id":workspace["id"],"name":"Review Product","category":"moisturizer"}).json()
+    creative = client.post("/v1/creatives", json={
+        "workspace_id":workspace["id"],"product_id":product["id"],
+        "concept_name":"Review concept","hook":"A product demo",
+        "hypothesis":"Product demo may improve understanding."
+    }).json()
+    asset = client.post("/v1/assets/versions", json={
+        "creative_id":creative["id"],"asset_type":"VIDEO",
+        "prompt_text":"Draft prompt","model_name":"demo-provider"
+    })
+    assert asset.status_code == 201
+    assert asset.json()["approval_status"] == "PENDING"
+    asset_id = asset.json()["id"]
+
+    review = client.post(f"/v1/assets/versions/{asset_id}/review", json={
+        "reviewer_id":"portfolio-owner","decision":"NEEDS_CHANGES",
+        "reason":"Check product depiction and claim support.",
+        "findings":[{"severity":"MEDIUM","issue":"claim evidence missing"}]
+    })
+    assert review.status_code == 201
+    assert review.json()["decision"] == "NEEDS_CHANGES"
+    versions = client.get(f"/v1/creatives/{creative['id']}/assets").json()
+    assert versions[0]["approval_status"] == "NEEDS_CHANGES"
