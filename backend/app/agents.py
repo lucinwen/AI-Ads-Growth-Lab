@@ -45,7 +45,7 @@ async def generate_creative_strategy(
 ) -> tuple[StrategyOutput, str]:
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        raise RuntimeError("OPENAI_API_KEY is not configured. Add it to backend/.env; the key is never stored in the database.")
+        raise RuntimeError("OPENAI_API_KEY is not configured. Add it to the repository-root .env file; the key is never stored in the database.")
     base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
     model = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
 
