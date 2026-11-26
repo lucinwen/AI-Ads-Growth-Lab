@@ -6,23 +6,31 @@ import os
 import json
 from math import isfinite
 import sqlite3
+import zipfile
+from io import BytesIO
 import uuid
 from time import perf_counter
 from typing import Literal
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, ConfigDict
 
 from .metrics import MetricRow, aggregate_metrics, compare_proportions
 from . import storage
 from .schemas import (WorkspaceCreate, ProductCreate, ClaimCreate, ClaimReviewCreate, CreativeCreate, AssetVersionCreate, AssetReviewCreate, ExperimentCreate, VariantCreate, StrategyRunRequest, ProductionRunRequest)
 from .agents import generate_creative_strategy, generate_production_brief
+from . import media
+from .schemas import ImageGenerationRequest, VideoGenerationRequest, AssetMetadataUpdate
 
-app = FastAPI(title="AI Ads Growth Lab API", version="0.4.0")
+app = FastAPI(title="AI Ads Growth Lab API", version="0.5.0")
 storage.init_db()
 storage.seed_demo_workspace()
+media.MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory=str(media.MEDIA_ROOT)), name="media")
 
 app.add_middleware(
     CORSMiddleware,
@@ -829,3 +837,233 @@ def demo_data_quality():
         }
     except (OSError, csv.Error, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+# Creative Production Studio — generated media library
+def _media_asset_dict(row):
+    result = dict(row)
+    try:
+        result["metadata"] = json.loads(result.pop("metadata_json") or "{}")
+    except (TypeError, json.JSONDecodeError):
+        result["metadata"] = {}
+    return result
+
+
+@app.get("/v1/creatives/{creative_id}/media-assets")
+def list_media_assets(creative_id: str):
+    with storage.connect() as db:
+        if not db.execute("SELECT 1 FROM creative WHERE id=?", (creative_id,)).fetchone():
+            raise HTTPException(status_code=404, detail="Creative not found")
+        rows = db.execute("SELECT * FROM media_asset WHERE creative_id=? ORDER BY created_at DESC", (creative_id,))
+        return [_media_asset_dict(row) for row in rows]
+
+
+@app.get("/v1/media-assets/{asset_id}")
+def get_media_asset(asset_id: str):
+    with storage.connect() as db:
+        row = db.execute("SELECT * FROM media_asset WHERE id=?", (asset_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Media asset not found")
+        return _media_asset_dict(row)
+
+
+@app.post("/v1/media-assets/generate-image", status_code=201)
+async def create_generated_image(payload: ImageGenerationRequest):
+    with storage.connect() as db:
+        creative = db.execute("SELECT workspace_id FROM creative WHERE id=?", (payload.creative_id,)).fetchone()
+        if not creative:
+            raise HTTPException(status_code=404, detail="Creative not found")
+        workspace_id = creative["workspace_id"]
+    try:
+        generated = await media.generate_image(payload.prompt, payload.size, payload.quality)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Image provider failed: {exc}") from exc
+
+    asset_id = str(uuid.uuid4())
+    filename = generated["asset_uri"].rsplit("/", 1)[-1]
+    with storage.connect() as db:
+        db.execute(
+            """INSERT INTO media_asset
+            (id,workspace_id,creative_id,asset_type,provider,model_name,prompt_text,asset_uri,
+             local_filename,content_type,byte_size,status,variation_group,metadata_json)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (asset_id, workspace_id, payload.creative_id, "IMAGE", generated["provider"],
+             generated["model"], payload.prompt, generated["asset_uri"], filename,
+             generated["content_type"], generated["bytes"], "GENERATED",
+             payload.variation_group, json.dumps({"size":payload.size,"quality":payload.quality})),
+        )
+        storage.audit(db, workspace_id, "GENERATE_IMAGE", "MEDIA_ASSET", asset_id,
+                      {"provider":generated["provider"],"model":generated["model"]})
+        row = db.execute("SELECT * FROM media_asset WHERE id=?", (asset_id,)).fetchone()
+        return _media_asset_dict(row)
+
+
+@app.post("/v1/media-assets/generate-video", status_code=202)
+async def create_generated_video(payload: VideoGenerationRequest):
+    with storage.connect() as db:
+        creative = db.execute("SELECT workspace_id FROM creative WHERE id=?", (payload.creative_id,)).fetchone()
+        if not creative:
+            raise HTTPException(status_code=404, detail="Creative not found")
+        workspace_id = creative["workspace_id"]
+    try:
+        job = await media.start_video(payload.prompt, payload.aspect_ratio, payload.duration_sec)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Video provider failed: {exc}") from exc
+    asset_id = str(uuid.uuid4())
+    with storage.connect() as db:
+        db.execute(
+            """INSERT INTO media_asset
+            (id,workspace_id,creative_id,asset_type,provider,model_name,prompt_text,status,metadata_json)
+            VALUES(?,?,?,?,?,?,?,?,?)""",
+            (asset_id, workspace_id, payload.creative_id, "VIDEO", job["provider"], job["model"],
+             payload.prompt, "GENERATING", json.dumps({"prediction_id":job["prediction_id"],"aspect_ratio":payload.aspect_ratio,"duration_sec":payload.duration_sec})),
+        )
+        storage.audit(db, workspace_id, "START_VIDEO_GENERATION", "MEDIA_ASSET", asset_id,
+                      {"prediction_id":job["prediction_id"],"model":job["model"]})
+        row = db.execute("SELECT * FROM media_asset WHERE id=?", (asset_id,)).fetchone()
+        return {**_media_asset_dict(row), "provider_status":job["status"]}
+
+
+@app.post("/v1/media-assets/{asset_id}/refresh")
+async def refresh_video_asset(asset_id: str):
+    with storage.connect() as db:
+        row = db.execute("SELECT * FROM media_asset WHERE id=?", (asset_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Media asset not found")
+        asset = _media_asset_dict(row)
+        if asset["asset_type"] != "VIDEO":
+            raise HTTPException(status_code=422, detail="Only video generation jobs can be refreshed")
+        prediction_id = asset["metadata"].get("prediction_id")
+    if not prediction_id:
+        raise HTTPException(status_code=422, detail="Video prediction ID is missing")
+    try:
+        result = await media.poll_video(prediction_id)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Video status check failed: {exc}") from exc
+    with storage.connect() as db:
+        if result["status"] == "succeeded" and result.get("asset_uri"):
+            filename = result["asset_uri"].rsplit("/", 1)[-1]
+            db.execute(
+                "UPDATE media_asset SET asset_uri=?,local_filename=?,content_type='video/mp4',status='GENERATED' WHERE id=?",
+                (result["asset_uri"], filename, asset_id),
+            )
+        elif result["status"] in {"failed", "canceled"}:
+            db.execute("UPDATE media_asset SET status='FAILED' WHERE id=?", (asset_id,))
+        current = db.execute("SELECT * FROM media_asset WHERE id=?", (asset_id,)).fetchone()
+        return {**_media_asset_dict(current), "provider_status":result["status"], "provider_error":result.get("error")}
+
+
+@app.post("/v1/media-assets/upload", status_code=201)
+async def upload_media_asset(
+    creative_id: str = Form(...),
+    file: UploadFile = File(...),
+    label: str = Form(""),
+):
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="A filename is required")
+    content_type = (file.content_type or "").lower()
+    if content_type not in {"image/png","image/jpeg","image/webp","video/mp4","video/webm"}:
+        raise HTTPException(status_code=415, detail="Only PNG, JPEG, WebP, MP4 and WebM files are supported")
+    raw = await file.read()
+    if len(raw) > 100 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Maximum upload size is 100 MB")
+    with storage.connect() as db:
+        creative = db.execute("SELECT workspace_id FROM creative WHERE id=?", (creative_id,)).fetchone()
+        if not creative:
+            raise HTTPException(status_code=404, detail="Creative not found")
+        workspace_id = creative["workspace_id"]
+    ext = media._safe_ext(content_type)
+    filename = f"upload-{uuid.uuid4()}{ext}"
+    media.MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+    (media.MEDIA_ROOT / filename).write_bytes(raw)
+    asset_id = str(uuid.uuid4())
+    asset_type = "IMAGE" if content_type.startswith("image/") else "VIDEO"
+    uri = f"{media.PUBLIC_BASE}/media/{filename}"
+    with storage.connect() as db:
+        db.execute(
+            """INSERT INTO media_asset
+            (id,workspace_id,creative_id,asset_type,provider,model_name,prompt_text,asset_uri,
+             local_filename,content_type,byte_size,status,label)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (asset_id,workspace_id,creative_id,asset_type,"USER_UPLOAD",None,"User uploaded asset",
+             uri,filename,content_type,len(raw),"UPLOADED",label or file.filename),
+        )
+        storage.audit(db,workspace_id,"UPLOAD_MEDIA","MEDIA_ASSET",asset_id,{"filename":file.filename,"bytes":len(raw)})
+        return _media_asset_dict(db.execute("SELECT * FROM media_asset WHERE id=?",(asset_id,)).fetchone())
+
+
+@app.patch("/v1/media-assets/{asset_id}")
+def update_media_asset(asset_id: str, payload: AssetMetadataUpdate):
+    with storage.connect() as db:
+        row = db.execute("SELECT * FROM media_asset WHERE id=?", (asset_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Media asset not found")
+        db.execute("UPDATE media_asset SET label=COALESCE(?,label), notes=COALESCE(?,notes) WHERE id=?",
+                   (payload.label,payload.notes,asset_id))
+        return _media_asset_dict(db.execute("SELECT * FROM media_asset WHERE id=?",(asset_id,)).fetchone())
+
+
+@app.post("/v1/media-assets/{asset_id}/review", status_code=201)
+def review_generated_media(asset_id: str, payload: AssetReviewCreate):
+    review_id = str(uuid.uuid4())
+    with storage.connect() as db:
+        asset = db.execute("SELECT * FROM media_asset WHERE id=?",(asset_id,)).fetchone()
+        if not asset:
+            raise HTTPException(status_code=404,detail="Media asset not found")
+        if asset["status"] in {"GENERATING","FAILED"}:
+            raise HTTPException(status_code=422,detail="Only completed media assets can be reviewed")
+        db.execute("INSERT INTO media_review(id,media_asset_id,reviewer_id,decision,reason) VALUES(?,?,?,?,?)",
+                   (review_id,asset_id,payload.reviewer_id,payload.decision,payload.reason))
+        db.execute("UPDATE media_asset SET status=? WHERE id=?",(payload.decision,asset_id))
+        storage.audit(db,asset["workspace_id"],"REVIEW_MEDIA","MEDIA_ASSET",asset_id,
+                      {"reviewer_id":payload.reviewer_id,"decision":payload.decision})
+        return dict(db.execute("SELECT * FROM media_review WHERE id=?",(review_id,)).fetchone())
+
+
+@app.get("/v1/media-assets/{asset_id}/reviews")
+def list_media_reviews(asset_id: str):
+    with storage.connect() as db:
+        if not db.execute("SELECT 1 FROM media_asset WHERE id=?",(asset_id,)).fetchone():
+            raise HTTPException(status_code=404,detail="Media asset not found")
+        return [dict(row) for row in db.execute("SELECT * FROM media_review WHERE media_asset_id=? ORDER BY created_at DESC",(asset_id,))]
+
+
+@app.post("/v1/media-assets/export")
+def export_media_assets(asset_ids: list[str]):
+    if not asset_ids or len(asset_ids) > 100:
+        raise HTTPException(status_code=422,detail="Select between 1 and 100 assets to export")
+    buffer = BytesIO()
+    missing = []
+    with storage.connect() as db:
+        placeholders = ",".join("?" for _ in asset_ids)
+        rows = db.execute(f"SELECT * FROM media_asset WHERE id IN ({placeholders})",asset_ids).fetchall()
+    if len(rows) != len(set(asset_ids)):
+        raise HTTPException(status_code=404,detail="One or more selected assets do not exist")
+    with zipfile.ZipFile(buffer,"w",zipfile.ZIP_DEFLATED) as archive:
+        manifest=[]
+        for row in rows:
+            asset=dict(row)
+            filename=asset.get("local_filename")
+            path=media.MEDIA_ROOT / filename if filename else None
+            if not path or not path.is_file():
+                missing.append(asset["id"])
+                continue
+            safe_name=re.sub(r"[^A-Za-z0-9._-]+","_",asset.get("label") or path.name)
+            if "." not in safe_name:
+                safe_name=path.stem+path.suffix
+            archive.write(path,f"assets/{safe_name}")
+            manifest.append({
+                "asset_id":asset["id"],"creative_id":asset["creative_id"],"asset_type":asset["asset_type"],
+                "provider":asset["provider"],"model":asset["model_name"],"prompt":asset["prompt_text"],
+                "asset_uri":asset["asset_uri"],"status":asset["status"],"content_type":asset["content_type"],
+                "byte_size":asset["byte_size"],"created_at":asset["created_at"]
+            })
+        if not manifest:
+            raise HTTPException(status_code=404,detail="No selected asset files are available on this server")
+        archive.writestr("manifest.json",json.dumps({"assets":manifest,"missing_asset_ids":missing},ensure_ascii=False,indent=2))
+    buffer.seek(0)
+    return StreamingResponse(buffer,media_type="application/zip",headers={"Content-Disposition":"attachment; filename=creative-assets-export.zip"})
