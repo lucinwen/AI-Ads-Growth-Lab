@@ -351,7 +351,11 @@ def list_experiments(workspace_id: str):
     with storage.connect() as db:
         if not db.execute("SELECT 1 FROM workspace WHERE id=?", (workspace_id,)).fetchone():
             raise HTTPException(status_code=404, detail="Workspace not found")
-        return [dict(row) for row in db.execute("SELECT * FROM experiment WHERE workspace_id=? ORDER BY created_at DESC", (workspace_id,))]
+        return [dict(row) for row in db.execute(
+            "SELECT e.*, (SELECT COUNT(*) FROM experiment_variant v WHERE v.experiment_id=e.id) AS variant_count "
+            "FROM experiment e WHERE e.workspace_id=? ORDER BY e.created_at DESC",
+            (workspace_id,),
+        )]
 
 
 @app.post("/v1/experiments/{experiment_id}/variants", status_code=201)
