@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import {
-  Activity, ArrowUpRight, BarChart3, Bell, Bot, Check,
+  Activity, ArrowUpRight, BarChart3, Bell, Bot, Check, Clapperboard, Download, Film, RefreshCw, Upload,
   ChevronDown, CircleHelp, Clock3, CloudUpload, FileCheck2, FlaskConical,
   Gauge, Image, LayoutDashboard, Layers3, Menu,
   MoreHorizontal, Plus, Search, ShieldCheck, Sparkles, Target, WandSparkles,
@@ -40,7 +40,8 @@ const conceptName: Record<string, string> = {
 };
 const nav = [
   { id: "overview", label: "Overview", icon: LayoutDashboard, group: "WORKSPACE" },
-  { id: "creative", label: "Creative studio", icon: WandSparkles, group: "WORKSPACE" },
+  { id: "creative", label: "Creative strategy", icon: WandSparkles, group: "WORKSPACE" },
+  { id: "production", label: "Production studio", icon: Clapperboard, group: "WORKSPACE" },
   { id: "experiments", label: "Experiments", icon: FlaskConical, group: "MEASUREMENT" },
   { id: "insights", label: "Growth insights", icon: BarChart3, group: "MEASUREMENT" },
   { id: "agents", label: "Agent activity", icon: Bot, group: "SYSTEM" },
@@ -149,13 +150,14 @@ export default function App() {
       </header>
       <div className="content">
         <div className="page-heading">
-          <div><div className="eyebrow">AI ADS GROWTH LAB <span>·</span> US BEAUTY & SKINCARE</div><h1>{page === "overview" ? "Creative performance" : pageTitle}</h1><p>{page === "overview" ? "A clearer view from creative hypotheses to measurable outcomes." : page === "creative" ? "Shape, compare and prepare creative concepts for controlled testing." : page === "experiments" ? "Pre-register hypotheses, isolate variables and understand what changed." : page === "insights" ? "Turn funnel signals into the next creative and growth decisions." : "Trace each workflow run, approval and system decision."}</p></div>
+          <div><div className="eyebrow">AI ADS GROWTH LAB <span>·</span> US BEAUTY & SKINCARE</div><h1>{page === "overview" ? "Creative performance" : pageTitle}</h1><p>{page === "overview" ? "A clearer view from creative hypotheses to measurable outcomes." : page === "creative" ? "Shape, compare and prepare creative concepts for controlled testing." : page === "production" ? "Generate, review, compare and export real creative assets." : page === "experiments" ? "Pre-register hypotheses, isolate variables and understand what changed." : page === "insights" ? "Turn funnel signals into the next creative and growth decisions." : "Trace each workflow run, approval and system decision."}</p></div>
           <div className="heading-actions"><Pill tone="green"><span className="status-dot"/> Demo workspace</Pill><button className="button button-primary" onClick={()=>setPage("creative")}><Plus size={16}/> New brief</button></div>
         </div>
 
         {apiError && <div className="api-alert"><div><strong>API connection unavailable</strong><span>Start the FastAPI service to load live demo metrics. The interface is running, but no numbers are being invented.</span></div><button onClick={()=>setRefresh(v=>v+1)}>Retry connection</button></div>}
         {page === "overview" && <OverviewPage overview={overview} loading={loading} search={search} onImport={importCsv} importing={importing} importResult={importResult} onRefresh={()=>setRefresh(v=>v+1)} />}
         {page === "creative" && <CreativePage drafts={drafts} setDrafts={setDrafts} newHook={newHook} setNewHook={setNewHook} notify={notify} workspaceId={overview?.workspace_id || ""} productId={overview?.product_id || ""}/>}
+        {page === "production" && <ProductionStudio drafts={drafts} notify={notify}/>}
         {page === "experiments" && <ExperimentsPage overview={overview} loading={loading}/>}
         {page === "insights" && <InsightsPage overview={overview} loading={loading}/>}
         {page === "agents" && <AgentsPage workspaceId={overview?.workspace_id || ""}/>}
@@ -226,6 +228,170 @@ function OverviewPage({overview,loading,search,onImport,importing,importResult,o
     </div>
   </>;
 }
+
+type MediaAsset = {
+  id:string; creative_id:string; asset_type:"IMAGE"|"VIDEO"; provider:string; model_name:string|null;
+  prompt_text:string; asset_uri:string|null; local_filename:string|null; content_type:string|null;
+  byte_size:number|null; status:string; variation_group:string|null; label:string|null; notes:string|null;
+  created_at:string; metadata:any;
+};
+
+function ProductionStudio({drafts,notify}:{drafts:{id:string;title:string;angle:string;hook:string;hypothesis:string;format:string;status:string}[];notify:(s:string)=>void}) {
+  const [creativeId,setCreativeId]=useState("");
+  const [assets,setAssets]=useState<MediaAsset[]>([]);
+  const [prompt,setPrompt]=useState("");
+  const [size,setSize]=useState("1024x1536");
+  const [quality,setQuality]=useState("high");
+  const [videoDuration,setVideoDuration]=useState(5);
+  const [busy,setBusy]=useState("");
+  const [message,setMessage]=useState("");
+  const [selected,setSelected]=useState<string[]>([]);
+  const [compareIds,setCompareIds]=useState<string[]>([]);
+  const [reviewer,setReviewer]=useState("creative-owner");
+  const [uploading,setUploading]=useState(false);
+
+  useEffect(()=>{if(!creativeId&&drafts.length)setCreativeId(drafts[0].id);},[drafts,creativeId]);
+  const selectedCreative=drafts.find(d=>d.id===creativeId);
+  async function loadAssets() {
+    if(!creativeId)return;
+    try {
+      const response=await fetch(`${API}/v1/creatives/${creativeId}/media-assets`);
+      const data=await response.json();
+      if(!response.ok)throw new Error(data.detail||"Could not load asset library");
+      setAssets(data);
+    }catch(err){setMessage(String((err as Error).message||err));}
+  }
+  useEffect(()=>{loadAssets();},[creativeId]);
+
+  async function generateImage() {
+    if(!creativeId||prompt.trim().length<20)return;
+    setBusy("image");setMessage("");
+    try {
+      const response=await fetch(`${API}/v1/media-assets/generate-image`,{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({creative_id:creativeId,prompt:prompt.trim(),size,quality,variation_group:`studio-${Date.now()}`})
+      });
+      const data=await response.json();
+      if(!response.ok)throw new Error(data.detail||"Image generation failed");
+      setMessage("Image generated and saved to the asset library.");
+      await loadAssets();
+      setSelected(old=>[data.id,...old]);
+    }catch(err){setMessage(String((err as Error).message||err));}
+    finally{setBusy("");}
+  }
+  async function generateVideo() {
+    if(!creativeId||prompt.trim().length<20)return;
+    setBusy("video");setMessage("");
+    try {
+      const response=await fetch(`${API}/v1/media-assets/generate-video`,{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({creative_id:creativeId,prompt:prompt.trim(),aspect_ratio:"9:16",duration_sec:videoDuration})
+      });
+      const data=await response.json();
+      if(!response.ok)throw new Error(data.detail||"Video generation could not start");
+      setMessage(`Video job created: ${data.id.slice(0,8)} · ${data.status}. Refresh the job to retrieve the rendered file when complete.`);
+      await loadAssets();
+    }catch(err){setMessage(String((err as Error).message||err));}
+    finally{setBusy("");}
+  }
+  async function refreshVideo(assetId:string) {
+    setBusy(assetId);setMessage("");
+    try {
+      const response=await fetch(`${API}/v1/media-assets/${assetId}/refresh`,{method:"POST"});
+      const data=await response.json();
+      if(!response.ok)throw new Error(data.detail||"Could not refresh video job");
+      setMessage(`Video job status: ${data.provider_status}${data.provider_error?` · ${data.provider_error}`:""}`);
+      await loadAssets();
+    }catch(err){setMessage(String((err as Error).message||err));}
+    finally{setBusy("");}
+  }
+  async function uploadFile(file?:File) {
+    if(!file||!creativeId)return;
+    setUploading(true);setMessage("");
+    const form=new FormData();form.append("creative_id",creativeId);form.append("label",file.name);form.append("file",file);
+    try {
+      const response=await fetch(`${API}/v1/media-assets/upload`,{method:"POST",body:form});
+      const data=await response.json();
+      if(!response.ok)throw new Error(data.detail||"Upload failed");
+      setMessage("Asset uploaded and registered.");
+      await loadAssets();
+      setSelected(old=>[data.id,...old]);
+    }catch(err){setMessage(String((err as Error).message||err));}
+    finally{setUploading(false);}
+  }
+  async function reviewAsset(assetId:string,decision:"APPROVED"|"NEEDS_CHANGES"|"REJECTED") {
+    const reason=decision==="APPROVED"?"Visual and production review completed.":"Requires another production review.";
+    const response=await fetch(`${API}/v1/media-assets/${assetId}/review`,{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({reviewer_id:reviewer,decision,reason})
+    });
+    const data=await response.json();
+    if(!response.ok){setMessage(data.detail||"Review failed");return;}
+    setMessage(`Asset marked ${decision}.`);
+    await loadAssets();
+  }
+  async function exportAssets(ids:string[]) {
+    if(!ids.length)return;
+    setBusy("export");
+    try {
+      const response=await fetch(`${API}/v1/media-assets/export`,{
+        method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(ids)
+      });
+      if(!response.ok){const data=await response.json();throw new Error(data.detail||"Export failed");}
+      const blob=await response.blob();
+      const url=URL.createObjectURL(blob);
+      const link=document.createElement("a");link.href=url;link.download="creative-assets-export.zip";link.click();
+      URL.revokeObjectURL(url);
+      notify("Asset ZIP export started.");
+    }catch(err){setMessage(String((err as Error).message||err));}
+    finally{setBusy("");}
+  }
+  const toggle=(id:string)=>setSelected(old=>old.includes(id)?old.filter(v=>v!==id):[...old,id]);
+  const toggleCompare=(id:string)=>setCompareIds(old=>old.includes(id)?old.filter(v=>v!==id):old.length<2?[...old,id]:[old[1],id]);
+  const compareAssets=assets.filter(a=>compareIds.includes(a.id));
+  return <div className="page-stack production-studio">
+    <div className="production-hero panel">
+      <div><Pill tone="green">ASSET PRODUCTION WORKSPACE</Pill><h2>Turn creative concepts into production-ready assets.</h2><p>Generate actual images, start asynchronous video jobs, upload existing media, review versions and export a traceable asset package.</p></div>
+      <div className="production-hero-mark"><Clapperboard size={30}/><span>STUDIO / 01</span></div>
+    </div>
+    <div className="production-workspace-grid">
+      <div className="panel production-controls">
+        <SectionTitle title="01 · Production brief" desc="Select a saved creative and define the generation prompt."/>
+        <label className="studio-label">CREATIVE CONCEPT<select value={creativeId} onChange={e=>{setCreativeId(e.target.value);setSelected([]);setCompareIds([]);}}>{drafts.map(d=><option key={d.id} value={d.id}>{d.title} — {d.angle}</option>)}</select></label>
+        {selectedCreative&&<div className="selected-concept"><span>{selectedCreative.angle}</span><strong>{selectedCreative.hook}</strong><p>{selectedCreative.hypothesis}</p></div>}
+        <label className="studio-label">IMAGE / VIDEO PROMPT<textarea rows={7} value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="Describe subject, art direction, lighting, lens, composition, motion, product packaging, background, and negative constraints…"/></label>
+        <div className="prompt-hint">Tip: specify camera, lighting, product framing, aspect ratio, typography constraints and what must not appear. Do not ask the model to invent product claims.</div>
+        <div className="studio-field-grid">
+          <label className="studio-label">IMAGE FORMAT<select value={size} onChange={e=>setSize(e.target.value)}><option value="1024x1536">9:16 · Portrait</option><option value="1024x1024">1:1 · Square</option><option value="1536x1024">16:9 · Landscape</option></select></label>
+          <label className="studio-label">QUALITY<select value={quality} onChange={e=>setQuality(e.target.value)}><option value="low">Draft · Low</option><option value="medium">Standard · Medium</option><option value="high">Production · High</option></select></label>
+        </div>
+        <div className="studio-actions">
+          <button className="button button-primary" disabled={!!busy||prompt.trim().length<20||!creativeId} onClick={generateImage}><Image size={15}/>{busy==="image"?"Generating image…":"Generate image"}</button>
+          <label className="button button-secondary upload-trigger"><Upload size={15}/>{uploading?"Uploading…":"Upload asset"}<input type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm" onChange={e=>uploadFile(e.target.files?.[0])}/></label>
+        </div>
+        <div className="video-job-control"><div><strong><Film size={15}/> Video generation</strong><span>Replicate provider · async job</span></div><select value={videoDuration} onChange={e=>setVideoDuration(Number(e.target.value))}><option value={5}>5 sec</option><option value={10}>10 sec</option><option value={15}>15 sec</option></select><button className="button button-secondary" disabled={!!busy||prompt.trim().length<20} onClick={generateVideo}>{busy==="video"?"Starting…":"Start video job"}</button></div>
+        <div className="provider-note"><ShieldCheck size={15}/><span>Image generation requires OPENAI_API_KEY and an image-capable model. Video generation requires REPLICATE_API_TOKEN and a configured model that accepts prompt, aspect_ratio and duration inputs. No placeholder media is created.</span></div>
+      </div>
+      <div className="panel asset-preview-panel">
+        <div className="panel-head"><div><h3>02 · Asset preview</h3><p>Actual generated or uploaded media files.</p></div><Pill tone="blue">{assets.length} assets</Pill></div>
+        {assets.length===0?<div className="studio-empty"><div><Image size={28}/></div><strong>Your asset canvas is empty</strong><p>Generate an image or upload a media file to start building the creative set.</p></div>:<div className="asset-grid">{assets.map(asset=><div className={`asset-card ${selected.includes(asset.id)?"asset-selected":""}`} key={asset.id}>
+          <label className="asset-select"><input type="checkbox" checked={selected.includes(asset.id)} onChange={()=>toggle(asset.id)}/> Select</label>
+          <button className={`asset-compare-toggle ${compareIds.includes(asset.id)?"chosen":""}`} onClick={()=>toggleCompare(asset.id)}>{compareIds.includes(asset.id)?"Comparing":"Compare"}</button>
+          <div className="asset-media">{asset.asset_uri&&asset.status!=="GENERATING"&&asset.status!=="FAILED"?(asset.asset_type==="IMAGE"?<img src={asset.asset_uri} alt={asset.label||asset.prompt_text}/>:<video src={asset.asset_uri} controls preload="metadata"/>):<div className="asset-job-state"><RefreshCw size={20}/><strong>{asset.status}</strong>{asset.status==="GENERATING"&&<button onClick={()=>refreshVideo(asset.id)} disabled={busy===asset.id}>{busy===asset.id?"Checking…":"Refresh job"}</button>}</div>}</div>
+          <div className="asset-card-body"><div className="asset-card-title"><strong>{asset.label||asset.asset_type+" asset"}</strong><Pill tone={asset.status==="APPROVED"?"green":asset.status==="FAILED"?"amber":"neutral"}>{asset.status}</Pill></div><p>{asset.prompt_text.slice(0,140)}{asset.prompt_text.length>140?"…":""}</p><small>{asset.provider} · {asset.model_name||"uploaded"} · {asset.byte_size?number(asset.byte_size)+" bytes":"pending"}</small>
+            {asset.asset_uri&&<a href={asset.asset_uri} target="_blank" rel="noreferrer">Open original <ArrowUpRight size={12}/></a>}
+            {asset.status!=="GENERATING"&&asset.status!=="FAILED"&&<div className="asset-review-actions"><button onClick={()=>reviewAsset(asset.id,"APPROVED")}>Approve</button><button onClick={()=>reviewAsset(asset.id,"NEEDS_CHANGES")}>Needs changes</button></div>}
+          </div>
+        </div>)}</div>}
+        <div className="asset-toolbar"><span>{selected.length} selected · {compareIds.length}/2 comparison slots</span><button className="button button-primary" disabled={!selected.length||busy==="export"} onClick={()=>exportAssets(selected)}><Download size={14}/>{busy==="export"?"Preparing…":"Export selected ZIP"}</button></div>
+      </div>
+    </div>
+    {message&&<div className="import-result">{message}</div>}
+    {compareAssets.length>0&&<div className="panel asset-comparison"><div className="panel-head"><div><h3>03 · Side-by-side comparison</h3><p>Compare up to two asset versions and their production metadata.</p></div><button className="button button-secondary" onClick={()=>setCompareIds([])}>Clear comparison</button></div><div className="compare-grid">{compareAssets.map(asset=><div key={asset.id}><div className="compare-media">{asset.asset_uri&&(asset.asset_type==="IMAGE"?<img src={asset.asset_uri} alt={asset.label||"Creative asset"}/>:<video src={asset.asset_uri} controls/>)}</div><strong>{asset.label||asset.asset_type}</strong><p>{asset.prompt_text}</p><small>{asset.provider} · {asset.model_name||"uploaded"} · {asset.created_at}</small></div>)}</div></div>}
+    <div className="panel production-governance"><ShieldCheck size={18}/><div><strong>Production evidence & review</strong><span>Each asset retains its prompt, provider, model, file type, size, creation time and review status. Export ZIP includes a manifest. Generated media is not automatically approved for advertising use.</span></div><label className="studio-label">REVIEWER<input value={reviewer} onChange={e=>setReviewer(e.target.value)} /></label></div>
+  </div>;
+}
+
 function ChartSkeleton(){return <div className="skeleton-chart"><div/><div/><div/><div/><div/><div/><div/></div>}
 
 function CreativePage({drafts,setDrafts,newHook,setNewHook,notify,workspaceId,productId}:{
