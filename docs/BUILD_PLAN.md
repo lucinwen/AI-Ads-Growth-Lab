@@ -36,19 +36,26 @@
 - [ ] Persisted AgentRun trace model
 
 ## P3 — Functional creative workspace
-- [ ] Creative brief editor with product facts and audience hypothesis
-- [ ] Strategy Agent generates structured concept matrix
+- [x] Persisted creative hypotheses and Creative Studio draft creation
+- [x] Product Claim Registry UI; new claims default to UNVERIFIED
+- [x] Claim evidence rule: VERIFIED requires evidence references
+- [x] Experiment builder persists experiment definitions and assigns creative variants
+- [x] Asset version records start PENDING and require a separate human review action
+- [ ] Full creative brief editor with product facts and audience hypothesis
 - [ ] Script / storyboard / prompt editor with version history
 - [ ] Asset upload, storage, preview, and version comparison
-- [ ] Compliance precheck linked to Claim Registry
-- [ ] Human approval queue blocks non-compliant assets
+- [ ] Compliance precheck linked to Claim Registry; block high-risk creative before READY_TO_TEST
 
 ## P4 — Agent workflow
-- [ ] Orchestrator and dependency-aware task graph
-- [ ] Strategy, Production, Compliance, Asset QA, Analytics, Growth Advisor agents
-- [ ] Structured tool schemas, timeouts, retries, idempotency, and error states
-- [ ] Prompt/model/version trace and cost/latency capture
-- [ ] Human approval gates for claims, assets, and any campaign action
+- [x] First executable Creative Strategy Agent via configurable OpenAI-compatible endpoint
+- [x] Structured JSON output validation and verified-claim ID enforcement
+- [x] Persisted AgentRun status, input/output references, model, latency and errors
+- [x] Creative Studio invokes Strategy Agent and saves returned concepts as drafts
+- [x] Agent Activity view displays persisted run history
+- [ ] Orchestrator and dependency-aware multi-agent task graph
+- [ ] Creative Production, Compliance, Asset QA, Analytics and Growth Advisor agents
+- [ ] Prompt/model cost tracking, retries, idempotency and structured tool traces
+- [ ] Human review workflow integrated into Agent task transitions
 
 ## P5 — Experiment analytics
 - [ ] Experiment Builder with pre-registration, MDE, power, and stopping rules
