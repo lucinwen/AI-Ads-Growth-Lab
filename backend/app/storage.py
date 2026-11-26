@@ -112,6 +112,18 @@ def init_db() -> None:
           input_refs_json TEXT NOT NULL DEFAULT '{}', output_refs_json TEXT NOT NULL DEFAULT '{}',
           error TEXT, latency_ms INTEGER, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS media_asset (
+          id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL REFERENCES workspace(id) ON DELETE CASCADE,
+          creative_id TEXT NOT NULL REFERENCES creative(id) ON DELETE CASCADE,
+          asset_type TEXT NOT NULL CHECK(asset_type IN ('IMAGE','VIDEO')),
+          provider TEXT NOT NULL, model_name TEXT, prompt_text TEXT NOT NULL,
+          asset_uri TEXT, local_filename TEXT, content_type TEXT, byte_size INTEGER,
+          status TEXT NOT NULL DEFAULT 'GENERATED',
+          variation_group TEXT, label TEXT, notes TEXT,
+          metadata_json TEXT NOT NULL DEFAULT '{}',
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_media_asset_creative ON media_asset(creative_id, created_at DESC);
         CREATE TABLE IF NOT EXISTS audit_log (
           id INTEGER PRIMARY KEY AUTOINCREMENT, workspace_id TEXT NOT NULL REFERENCES workspace(id) ON DELETE CASCADE,
           actor_type TEXT NOT NULL, actor_id TEXT, action TEXT NOT NULL,
