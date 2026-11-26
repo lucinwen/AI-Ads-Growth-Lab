@@ -275,3 +275,35 @@ def test_strategy_agent_persists_generated_draft_concepts(monkeypatch):
     assert payload["concepts"][0]["status"] == "DRAFT_REQUIRES_REVIEW"
     saved = client.get("/v1/workspaces/demo-us-beauty-workspace/creatives").json()
     assert any(item["concept_name"] == "Routine framing" for item in saved)
+
+
+def test_creative_production_agent_persists_storyboard(monkeypatch):
+    import app.main as main_module
+    from app.agents import ProductionOutput, ProductionScene
+
+    async def fake_production(**kwargs):
+        return ProductionOutput(
+            title="Daily routine product demo",
+            hook="A simple step in my morning routine.",
+            scenes=[
+                ProductionScene(scene_number=1,duration_sec=4,visual_description="Product on a clean bathroom shelf.",camera_direction="Slow push-in.",on_screen_text="Daily routine",voiceover="",asset_prompt="Minimal premium skincare product shot.",claims_used=[]),
+                ProductionScene(scene_number=2,duration_sec=8,visual_description="Close-up of the product packaging and texture.",camera_direction="Macro detail shot.",on_screen_text="A closer look",voiceover="Take a closer look at the product.",asset_prompt="Macro product texture demonstration without efficacy implication.",claims_used=[]),
+                ProductionScene(scene_number=3,duration_sec=6,visual_description="Product placed beside everyday skincare items.",camera_direction="Static medium shot.",on_screen_text="Explore the details",voiceover="Explore the product details.",asset_prompt="Clean tabletop product arrangement.",claims_used=[])
+            ],
+            caption="Explore the product details.",
+            cta="Learn more",
+            production_notes=["All claims require product evidence review."]
+        ), "test-model"
+
+    monkeypatch.setattr(main_module, "generate_production_brief", fake_production)
+    response = client.post("/v1/agents/creative-production/run", json={
+        "creative_id":"demo-creative-routine","duration_sec":20,"placement":"9:16","language":"en-US"
+    })
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["agent_name"] == "creative_production"
+    assert len(payload["production"]["scenes"]) == 3
+    assert payload["limitations"][0].startswith("This output is a script/storyboard")
+    drafts = client.get("/v1/creatives/demo-creative-routine/production-drafts")
+    assert drafts.status_code == 200
+    assert drafts.json()[0]["status"] == "DRAFT_REQUIRES_REVIEW"
