@@ -67,6 +67,13 @@ def init_db() -> None:
           claims_used_json TEXT NOT NULL DEFAULT '[]',
           created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS production_draft (
+          id TEXT PRIMARY KEY, creative_id TEXT NOT NULL REFERENCES creative(id) ON DELETE CASCADE,
+          version_no INTEGER NOT NULL, model_name TEXT NOT NULL, production_json TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'DRAFT_REQUIRES_REVIEW',
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(creative_id, version_no)
+        );
         CREATE TABLE IF NOT EXISTS asset_version (
           id TEXT PRIMARY KEY, creative_id TEXT NOT NULL REFERENCES creative(id) ON DELETE CASCADE,
           version_no INTEGER NOT NULL, asset_type TEXT NOT NULL, asset_uri TEXT,
