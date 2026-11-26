@@ -7,6 +7,9 @@ services:
     environment:
       AI_ADS_DEMO_DATA_PATH: /app/data/synthetic_daily_metrics.csv
       AI_ADS_DB_PATH: /app/runtime-data/growthlab.sqlite3
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
     volumes:
       - ./backend/app:/app/app
       - ./data:/app/data:ro
