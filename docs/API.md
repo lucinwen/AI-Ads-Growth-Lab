@@ -15,6 +15,7 @@ The current local runtime uses SQLite for persistence. The PostgreSQL schema is 
 - `POST /v1/claims` / `GET /v1/products/{product_id}/claims`
 - `POST /v1/creatives` / `GET /v1/workspaces/{workspace_id}/creatives`
 - `POST /v1/assets/versions` / `GET /v1/creatives/{creative_id}/assets`
+- `POST /v1/assets/versions/{asset_version_id}/review` / `GET /v1/assets/versions/{asset_version_id}/reviews`
 - `POST /v1/experiments` / `GET /v1/workspaces/{workspace_id}/experiments`
 - `POST /v1/experiments/{experiment_id}/variants` / `GET /v1/experiments/{experiment_id}/variants`
 - `GET /v1/workspaces/{workspace_id}/audit`
@@ -26,6 +27,7 @@ The current local runtime uses SQLite for persistence. The PostgreSQL schema is 
 - Experiment variants can only reference creatives from the same workspace.
 - Every create operation writes an audit record.
 - Asset versions increment per creative and are not overwritten.
+- New asset versions always start as PENDING; a separate review endpoint records reviewer, decision, reason and findings.
 
 ## Metrics
 - `POST /v1/metrics/aggregate` — deterministic metric aggregation.
