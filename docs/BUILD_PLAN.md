@@ -2,11 +2,11 @@
 
 ## P0 — First vertical slice
 - [x] Initialize repository and project documentation
-- [ ] Deterministic metric engine
-- [ ] CSV schema validation and SIMULATED/REAL isolation
-- [ ] Synthetic seed CSV and import example
-- [ ] Pytest unit tests
-- [ ] FastAPI health and aggregation endpoints
+- [x] Deterministic metric engine (aggregation API + zero-denominator handling)
+- [x] CSV schema validation and SIMULATED/REAL isolation
+- [x] Synthetic seed CSV (84 daily rows / 12 variants / 7 days)
+- [x] Pytest unit/API smoke tests added (CI execution pending)
+- [x] FastAPI health, aggregation, and CSV validation endpoints
 
 ## P1 — Core product data
 - [ ] Workspace / Brand / Product / Claim models
