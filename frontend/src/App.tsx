@@ -24,7 +24,7 @@ type Totals = {
 type CreativeRow = { creative_id: string; concept: string; variant: string; totals: Totals; metrics: MetricSet };
 type DailyRow = { date: string; spend_usd: number; revenue_usd: number; impressions: number; clicks: number; purchases: number; roas: number | null; ctr: number | null };
 type Overview = {
-  experiment_id: string; workspace: string; data_mode: "SIMULATED" | "REAL";
+  experiment_id: string; workspace_id: string; product_id: string; workspace: string; data_mode: "SIMULATED" | "REAL";
   source: string; date_range: { start: string; end: string }; row_count: number;
   creative_count: number; summary: { totals: Totals; metrics: MetricSet };
   daily: DailyRow[]; creatives: CreativeRow[];
@@ -70,12 +70,7 @@ export default function App() {
   const [toast, setToast] = useState("");
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<string>("");
-  const [drafts, setDrafts] = useState([
-    { id: "C-A", title: "Everyday ritual", angle: "Routine / everyday", hook: "A simple step in my morning routine.", hypothesis: "Routine framing may make the product feel relevant to daily use.", format: "Vertical video · 20s", status: "Strategy draft" },
-    { id: "C-B", title: "Texture study", angle: "Texture / sensory", hook: "A closer look at the texture.", hypothesis: "A close-up product demonstration may increase qualified curiosity.", format: "Product demo · 15s", status: "Strategy draft" },
-    { id: "C-C", title: "Ingredient education", angle: "Product education", hook: "What is in my daily moisturizer?", hypothesis: "Fact-based education may improve product understanding.", format: "Explainer · 25s", status: "Needs claim evidence" },
-    { id: "C-D", title: "Creator walkthrough", angle: "Creator-style", hook: "Here is how the product fits into my routine.", hypothesis: "Creator-style delivery may improve attention and comprehension.", format: "Creator-style · 20s", status: "Strategy draft" },
-  ]);
+  const [drafts, setDrafts] = useState<{id:string;title:string;angle:string;hook:string;hypothesis:string;format:string;status:string}[]>([]);
   const [newHook, setNewHook] = useState("");
 
   useEffect(() => {
@@ -88,6 +83,18 @@ export default function App() {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [refresh]);
+
+  useEffect(() => {
+    if (!overview?.workspace_id) return;
+    fetch(`${API}/v1/workspaces/${overview.workspace_id}/creatives`)
+      .then(r => { if (!r.ok) throw new Error("Could not load saved creative hypotheses"); return r.json(); })
+      .then(rows => setDrafts(rows.map((row: any) => ({
+        id: row.id, title: row.concept_name, angle: row.angle || "Unspecified angle",
+        hook: row.hook || "Hook not drafted", hypothesis: row.hypothesis || "Hypothesis to be defined.",
+        format: row.format || "Format not specified", status: "Saved in workspace"
+      }))))
+      .catch(err => setApiError(String(err.message || err)));
+  }, [overview?.workspace_id]);
 
   const notify = (message: string) => {
     setToast(message);
@@ -143,12 +150,12 @@ export default function App() {
       <div className="content">
         <div className="page-heading">
           <div><div className="eyebrow">AI ADS GROWTH LAB <span>·</span> US BEAUTY & SKINCARE</div><h1>{page === "overview" ? "Creative performance" : pageTitle}</h1><p>{page === "overview" ? "A clearer view from creative hypotheses to measurable outcomes." : page === "creative" ? "Shape, compare and prepare creative concepts for controlled testing." : page === "experiments" ? "Pre-register hypotheses, isolate variables and understand what changed." : page === "insights" ? "Turn funnel signals into the next creative and growth decisions." : "Trace each workflow run, approval and system decision."}</p></div>
-          <div className="heading-actions"><Pill tone="green"><span className="status-dot"/> Demo workspace</Pill><button className="button button-primary" onClick={()=>notify("New campaign brief: editor is the next build milestone.")}><Plus size={16}/> New brief</button></div>
+          <div className="heading-actions"><Pill tone="green"><span className="status-dot"/> Demo workspace</Pill><button className="button button-primary" onClick={()=>setPage("creative")}><Plus size={16}/> New brief</button></div>
         </div>
 
         {apiError && <div className="api-alert"><div><strong>API connection unavailable</strong><span>Start the FastAPI service to load live demo metrics. The interface is running, but no numbers are being invented.</span></div><button onClick={()=>setRefresh(v=>v+1)}>Retry connection</button></div>}
         {page === "overview" && <OverviewPage overview={overview} loading={loading} search={search} onImport={importCsv} importing={importing} importResult={importResult} onRefresh={()=>setRefresh(v=>v+1)} />}
-        {page === "creative" && <CreativePage drafts={drafts} setDrafts={setDrafts} newHook={newHook} setNewHook={setNewHook} notify={notify}/>}
+        {page === "creative" && <CreativePage drafts={drafts} setDrafts={setDrafts} newHook={newHook} setNewHook={setNewHook} notify={notify} workspaceId={overview?.workspace_id || ""} productId={overview?.product_id || ""}/>}
         {page === "experiments" && <ExperimentsPage overview={overview} loading={loading}/>}
         {page === "insights" && <InsightsPage overview={overview} loading={loading}/>}
         {page === "agents" && <AgentsPage/>}
@@ -204,15 +211,37 @@ function OverviewPage({overview,loading,search,onImport,importing,importResult,o
 }
 function ChartSkeleton(){return <div className="skeleton-chart"><div/><div/><div/><div/><div/><div/><div/></div>}
 
-function CreativePage({drafts,setDrafts,newHook,setNewHook,notify}:{
+function CreativePage({drafts,setDrafts,newHook,setNewHook,notify,workspaceId,productId}:{
   drafts:{id:string;title:string;angle:string;hook:string;hypothesis:string;format:string;status:string}[];
   setDrafts:(v:any)=>void;newHook:string;setNewHook:(v:string)=>void;notify:(s:string)=>void;
 }) {
+  async function saveCreativeDraft() {
+    if (!newHook.trim() || !workspaceId || !productId) return;
+    try {
+      const response = await fetch(`${API}/v1/creatives`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspace_id: workspaceId, product_id: productId,
+          concept_name: "Custom concept", angle: "Custom hypothesis",
+          hook: newHook.trim(), hypothesis: "Hypothesis to be defined and reviewed.",
+          format: "Draft · not generated", language: "en-US"
+        })
+      });
+      const row = await response.json();
+      if (!response.ok) throw new Error(row.detail || "Could not save creative draft");
+      setDrafts((old:any)=>[{id:row.id,title:row.concept_name,angle:row.angle,hook:row.hook,hypothesis:row.hypothesis,format:row.format,status:"Saved in workspace"},...old]);
+      setNewHook("");
+      notify("Creative hypothesis saved to workspace.");
+    } catch (err) {
+      notify(String((err as Error).message || err));
+    }
+  }
   return <div className="page-stack">
     <div className="creative-intro panel"><div className="intro-symbol"><WandSparkles size={24}/></div><div><h3>From product facts to testable creative hypotheses</h3><p>Draft distinct creative routes before generating assets. Every objective claim must be linked to evidence before an asset can enter review.</p></div><Pill tone="amber">Strategy workspace</Pill></div>
     <SectionTitle title="Creative routes" desc="Four differentiated directions for the fictional Luma Dew moisturizer." action={<Pill tone="green">4 concepts</Pill>}/>
     <div className="concept-grid">{drafts.map((d,i)=><div className="concept-card" key={d.id}><div className="concept-top"><span className={`concept-number n-${i}`}>0{i+1}</span><Pill tone={d.status.includes("Needs")?"amber":"neutral"}>{d.status}</Pill></div><div className={`concept-art art-${i}`}><div className="art-bottle"/><span>{["DAILY RITUAL","TEXTURE NOTES","FORMULA / FACTS","REAL-LIFE ROUTINE"][i]}</span></div><div className="concept-body"><span className="concept-angle">{d.angle}</span><h3>{d.title}</h3><blockquote>“{d.hook}”</blockquote><p>{d.hypothesis}</p><div className="concept-foot"><span><Image size={14}/>{d.format}</span><button onClick={()=>notify("Concept detail editor is queued for the next milestone.")}>View brief <ArrowUpRight size={14}/></button></div></div></div>)}</div>
-    <div className="panel quick-draft"><div><h3><Plus size={17}/> Add a creative hypothesis</h3><p>Save a new hook as a local draft. This does not call a generation model.</p></div><div className="draft-form"><input value={newHook} onChange={e=>setNewHook(e.target.value)} placeholder="Write an English hook or creative angle…"/><button className="button button-primary" disabled={!newHook.trim()} onClick={()=>{setDrafts((old:any)=>[...old,{id:"C-E",title:"New concept",angle:"Custom hypothesis",hook:newHook,hypothesis:"Hypothesis to be defined and reviewed.",format:"Draft · not generated",status:"Local draft"}]);setNewHook("");notify("Creative hypothesis saved as a local draft.");}}><Plus size={15}/> Save draft</button></div></div>
+    <div className="panel quick-draft"><div><h3><Plus size={17}/> Add a creative hypothesis</h3><p>Save a new hook as a local draft. This does not call a generation model.</p></div><div className="draft-form"><input value={newHook} onChange={e=>setNewHook(e.target.value)} placeholder="Write an English hook or creative angle…"/><button className="button button-primary" disabled={!newHook.trim() || !workspaceId} onClick={saveCreativeDraft}><Plus size={15}/> Save draft</button></div></div>
     <div className="compliance-inline"><ShieldCheck size={17}/><div><strong>Claim evidence gate</strong><span>“Clinically proven”, acne-treatment and unsupported before/after claims remain blocked until evidence and regulatory review are attached.</span></div><Pill tone="amber">Human review required</Pill></div>
   </div>;
 }
