@@ -109,3 +109,31 @@ def audit(db: sqlite3.Connection, workspace_id: str, action: str, entity_type: s
         "INSERT INTO audit_log(workspace_id,actor_type,actor_id,action,entity_type,entity_id,details_json) VALUES(?,?,?,?,?,?,?)",
         (workspace_id, "USER", "local-owner", action, entity_type, entity_id, json.dumps(details or {}, ensure_ascii=False)),
     )
+
+
+def seed_demo_workspace() -> tuple[str, str]:
+    """Create an idempotent fictional demo workspace and its starter creative hypotheses."""
+    workspace_id = "demo-us-beauty-workspace"
+    product_id = "demo-luma-dew-moisturizer"
+    with connect() as db:
+        db.execute(
+            "INSERT OR IGNORE INTO workspace(id,name,market,vertical,data_mode) VALUES(?,?,?,?,?)",
+            (workspace_id, "Luma Dew / US Beauty Demo", "US", "beauty_skincare", "SIMULATED"),
+        )
+        db.execute(
+            "INSERT OR IGNORE INTO product(id,workspace_id,name,category,currency,price_cents,facts_json,landing_page_url) VALUES(?,?,?,?,?,?,?,?)",
+            (product_id, workspace_id, "Daily Barrier Moisturizer", "moisturizer", "USD", 2800,
+             json.dumps({"brand":"Luma Dew","fictional":True,"approved_claims":[]}, ensure_ascii=False), None),
+        )
+        starter = [
+            ("demo-creative-routine", "Everyday ritual", "Routine / everyday", "A simple step in my morning routine.", "Routine framing may make the product feel relevant to daily use.", "UGC vertical video · 20s"),
+            ("demo-creative-texture", "Texture study", "Texture / sensory", "A closer look at the texture.", "A close-up product demonstration may increase qualified curiosity.", "Product demo · 15s"),
+            ("demo-creative-education", "Ingredient education", "Product education", "What is in my daily moisturizer?", "Fact-based education may improve product understanding.", "Explainer · 25s"),
+            ("demo-creative-creator", "Creator walkthrough", "Creator-style", "Here is how the product fits into my routine.", "Creator-style delivery may improve attention and comprehension.", "Creator-style · 20s"),
+        ]
+        for creative_id, name, angle, hook, hypothesis, fmt in starter:
+            db.execute(
+                "INSERT OR IGNORE INTO creative(id,workspace_id,product_id,concept_name,angle,hook,hypothesis,format,language) VALUES(?,?,?,?,?,?,?,?,?)",
+                (creative_id, workspace_id, product_id, name, angle, hook, hypothesis, fmt, "en-US"),
+            )
+        return workspace_id, product_id
