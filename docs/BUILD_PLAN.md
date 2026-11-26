@@ -5,7 +5,7 @@
 - [x] Deterministic metric engine (aggregation API + zero-denominator handling)
 - [x] CSV schema validation and SIMULATED/REAL isolation
 - [x] Synthetic seed CSV (84 daily rows / 12 variants / 7 days)
-- [x] Pytest unit/API smoke tests added (CI execution pending)
+- [x] Pytest unit/API smoke tests passing in GitHub Actions
 - [x] FastAPI health, aggregation, and CSV validation endpoints
 
 ## P1 — Core product data
