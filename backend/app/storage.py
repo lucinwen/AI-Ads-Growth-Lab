@@ -54,6 +54,7 @@ def init_db() -> None:
           product_id TEXT NOT NULL REFERENCES product(id) ON DELETE CASCADE,
           concept_name TEXT NOT NULL, angle TEXT, hook TEXT, narrative TEXT, cta TEXT,
           language TEXT NOT NULL DEFAULT 'en-US', format TEXT, hypothesis TEXT,
+          claims_used_json TEXT NOT NULL DEFAULT '[]',
           created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
         CREATE TABLE IF NOT EXISTS asset_version (
@@ -105,13 +106,16 @@ def init_db() -> None:
         CREATE INDEX IF NOT EXISTS idx_creative_workspace ON creative(workspace_id);
         CREATE INDEX IF NOT EXISTS idx_experiment_workspace ON experiment(workspace_id);
         """)
+        creative_columns = {row["name"] for row in db.execute("PRAGMA table_info(creative)")}
+        if "claims_used_json" not in creative_columns:
+            db.execute("ALTER TABLE creative ADD COLUMN claims_used_json TEXT NOT NULL DEFAULT '[]'")
 
 
 def row_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:
     if row is None:
         return None
     result = dict(row)
-    for key in ("facts_json", "evidence_refs_json", "details_json"):
+    for key in ("facts_json", "evidence_refs_json", "details_json", "claims_used_json"):
         if key in result and result[key] is not None:
             result[key.removesuffix("_json")] = json.loads(result.pop(key))
     return result
