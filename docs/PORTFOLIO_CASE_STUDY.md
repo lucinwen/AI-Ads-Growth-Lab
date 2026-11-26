@@ -59,9 +59,9 @@ No automatic ad publishing, budget changes or campaign operations are implemente
 - GitHub Actions runs backend tests and frontend production build.
 
 ## Current verification
-- Backend test suite: 23 tests passed in GitHub Actions at the last recorded full run.
+- Backend test suite: 27 tests passed in GitHub Actions at the last recorded full run.
 - Frontend TypeScript/Vite production build: passed in GitHub Actions at the last recorded full run.
-- Test coverage includes metric calculations, zero denominators, SIMULATED/REAL isolation, CSV validation, workspace/product/claim/creative/experiment persistence, asset review, Strategy and Production Agent provider paths using mocked providers, asset/claim review evidence gates, and statistical comparison/sample sufficiency tests, and row-level data quality audit checks.
+- Test coverage includes metric calculations, zero denominators, SIMULATED/REAL isolation, CSV validation, workspace/product/claim/creative/experiment persistence, asset review, Strategy and Production Agent provider paths using mocked providers, asset/claim review evidence gates, and statistical comparison/sample sufficiency tests, and row-level data quality audit checks, media upload/review/export, and provider-configuration failure paths.
 
 ## Demo flow
 1. Open Overview and inspect the clearly labeled synthetic dataset.
@@ -93,7 +93,7 @@ All 84 daily media records, impressions, clicks, purchases, spend, attributed re
 ### Not yet implemented
 - PostgreSQL runtime and migrations (SQLite is the current local adapter).
 - Full multi-agent orchestrator and specialist execution beyond Strategy and Production.
-- Production-grade provider-specific video adapters, generation queue/retries and cost telemetry.
+- Provider-specific video input adapters, generation queue/retries and cost telemetry.\n- Live image/video provider smoke tests using user-owned credentials (CI uses mocked providers and does not incur generation spend).
 - Full claim-review evidence UI and regulatory workflow.
 - Read-only TikTok/Meta account connectors.
 - Real randomized A/B tests, robust power analysis against actual traffic, sequential-testing controls, multiple-comparison correction, incrementality measurement, and actual campaign results.
