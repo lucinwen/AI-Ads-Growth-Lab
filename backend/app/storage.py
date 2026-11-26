@@ -124,6 +124,12 @@ def init_db() -> None:
           created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
         CREATE INDEX IF NOT EXISTS idx_media_asset_creative ON media_asset(creative_id, created_at DESC);
+        CREATE TABLE IF NOT EXISTS media_review (
+          id TEXT PRIMARY KEY, media_asset_id TEXT NOT NULL REFERENCES media_asset(id) ON DELETE CASCADE,
+          reviewer_id TEXT NOT NULL, decision TEXT NOT NULL
+            CHECK(decision IN ('APPROVED','REJECTED','NEEDS_CHANGES','BLOCKED')),
+          reason TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
         CREATE TABLE IF NOT EXISTS audit_log (
           id INTEGER PRIMARY KEY AUTOINCREMENT, workspace_id TEXT NOT NULL REFERENCES workspace(id) ON DELETE CASCADE,
           actor_type TEXT NOT NULL, actor_id TEXT, action TEXT NOT NULL,
