@@ -247,15 +247,69 @@ function CreativePage({drafts,setDrafts,newHook,setNewHook,notify,workspaceId,pr
 }
 
 function ExperimentsPage({overview,loading}:{overview:Overview|null;loading:boolean}) {
+  const [experiments,setExperiments] = useState<any[]>([]);
+  const [name,setName] = useState("US skincare creative angle test");
+  const [hypothesis,setHypothesis] = useState("Different creative framing will produce different attention and click-to-purchase patterns.");
+  const [saving,setSaving] = useState(false);
+  const [message,setMessage] = useState("");
+  useEffect(() => {
+    if (!overview?.workspace_id) return;
+    fetch(`${API}/v1/workspaces/${overview.workspace_id}/experiments`)
+      .then(r => { if (!r.ok) throw new Error("Could not load experiments"); return r.json(); })
+      .then(setExperiments)
+      .catch(err => setMessage(String(err.message || err)));
+  }, [overview?.workspace_id]);
+  async function createExperiment() {
+    if (!overview?.workspace_id || !name.trim() || !hypothesis.trim()) return;
+    setSaving(true); setMessage("");
+    try {
+      const response = await fetch(`${API}/v1/experiments`, {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          workspace_id:overview.workspace_id, name:name.trim(), hypothesis:hypothesis.trim(),
+          channel:"TikTok", data_mode:"SIMULATED", attribution_window:"7-day click",
+          timezone:"America/Los_Angeles", budget_cap_cents:120000, currency:"USD"
+        })
+      });
+      const created = await response.json();
+      if (!response.ok) throw new Error(created.detail || "Could not create experiment");
+      const creatives = await fetch(`${API}/v1/workspaces/${overview.workspace_id}/creatives`).then(r=>r.json());
+      const selected = creatives.slice(0,4);
+      for (let i=0;i<selected.length;i++) {
+        const variantResponse = await fetch(`${API}/v1/experiments/${created.id}/variants`, {
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({creative_id:selected[i].id,allocation_pct:100/selected.length,role:i===0?"CONTROL":"TREATMENT"})
+        });
+        if (!variantResponse.ok) throw new Error("Experiment created, but a creative variant could not be attached.");
+      }
+      const variants = await fetch(`${API}/v1/experiments/${created.id}/variants`).then(r=>r.json());
+      setExperiments(old=>[{...created,variant_count:variants.length},...old]);
+      setMessage("Experiment saved with " + variants.length + " creative variants. This is a configuration record, not a live ad campaign.");
+    } catch (err) {
+      setMessage(String((err as Error).message || err));
+    } finally { setSaving(false); }
+  }
   return <div className="page-stack">
     <div className="panel experiment-hero"><div><Pill tone="green">EXP-US-BEAUTY-001</Pill><h2>Creative angle exploration</h2><p>Compare four creative hypotheses using a fixed fictional product and a synthetic seven-day dataset.</p><div className="hero-meta"><span><Clock3 size={14}/> Dec 01–07, 2026</span><span><Layers3 size={14}/> 4 concepts / 12 variants</span><span><FlaskConical size={14}/> Descriptive demo</span></div></div><div className="hero-stamp">SIM<br/>DATA</div></div>
     <div className="metric-grid compact">
-      <MetricCard label="Creative variants" value="12" hint="4 concepts × 3 variants" icon={<Layers3 size={17}/>}/>
+      <MetricCard label="Creative variants" value="12" hint="4 concepts × 3 versions" icon={<Layers3 size={17}/>}/>
       <MetricCard label="Daily records" value={overview?String(overview.row_count):"—"} hint="Synthetic metric rows" icon={<Activity size={17}/>} accent="teal"/>
       <MetricCard label="Impressions" value={loading?"…":number(overview?.summary.totals.impressions)} hint="Aggregated across variants" icon={<Image size={17}/>} accent="purple"/>
       <MetricCard label="Purchases" value={loading?"…":number(overview?.summary.totals.purchases)} hint="Synthetic attributed events" icon={<Target size={17}/>} accent="blue"/>
     </div>
-    <div className="panel"><SectionTitle title="Experiment design" desc="Pre-registered comparison framework for a future real test."/><div className="design-grid"><div><span>PRIMARY QUESTION</span><strong>Which creative framing earns qualified attention without weakening downstream conversion?</strong></div><div><span>PRIMARY METRICS</span><strong>CTR and click-to-purchase CVR, reported separately</strong></div><div><span>CONTROL VARIABLES</span><strong>Product, offer, landing page, audience, placement, schedule</strong></div><div><span>GUARDRAILS</span><strong>Claim risk, landing-page mismatch, tracking quality, refunds</strong></div></div></div>
+    <div className="panel">
+      <SectionTitle title="Create an experiment" desc="Save an experiment definition and attach the four seeded creative hypotheses."/>
+      <div className="experiment-form">
+        <label>Experiment name<input value={name} onChange={e=>setName(e.target.value)} /></label>
+        <label>Hypothesis<textarea value={hypothesis} onChange={e=>setHypothesis(e.target.value)} rows={2}/></label>
+        <div className="form-actions"><span>Mode: SIMULATED · Channel: TikTok · Budget cap: $1,200 (not spent)</span><button className="button button-primary" disabled={saving||!overview?.workspace_id} onClick={createExperiment}><Plus size={15}/>{saving?"Saving…":"Create experiment"}</button></div>
+        {message&&<div className="import-result">{message}</div>}
+      </div>
+    </div>
+    <div className="panel"><SectionTitle title="Saved experiment records" desc="Persistent local records. These do not launch ads or spend budget."/>
+      {experiments.length ? <div className="saved-experiments">{experiments.map((e:any)=><div className="saved-experiment" key={e.id}><div className="experiment-icon"><FlaskConical size={17}/></div><div className="saved-exp-copy"><strong>{e.name}</strong><span>{e.hypothesis}</span><small>{e.channel} · {e.data_mode} · {e.status}</small></div><Pill tone="blue">{e.variant_count ?? "Saved" } variants</Pill></div>)}</div> : <div className="empty-state-inline">{loading?"Loading workspace…":"No saved experiments yet. Create one above to persist the hypothesis and variants."}</div>}
+    </div>
+    <div className="panel"><SectionTitle title="Experiment design" desc="Pre-registration framework for a future real test."/><div className="design-grid"><div><span>PRIMARY QUESTION</span><strong>Which creative framing earns qualified attention without weakening downstream conversion?</strong></div><div><span>PRIMARY METRICS</span><strong>CTR and click-to-purchase CVR, reported separately</strong></div><div><span>CONTROL VARIABLES</span><strong>Product, offer, landing page, audience, placement, schedule</strong></div><div><span>GUARDRAILS</span><strong>Claim risk, landing-page mismatch, tracking quality, refunds</strong></div></div></div>
     <div className="panel"><SectionTitle title="Creative hypothesis matrix" desc="The hypotheses are not conclusions; the data is synthetic."/><div className="hypothesis-list">{["Routine framing may fit naturally into daily use.","Texture demonstration may improve qualified curiosity.","Fact-based education may improve product understanding.","Creator-style delivery may improve attention and comprehension."].map((v,i)=><div className="hypothesis-row" key={v}><span className={`concept-number n-${i}`}>0{i+1}</span><div><strong>{["Everyday ritual","Texture study","Ingredient education","Creator walkthrough"][i]}</strong><p>{v}</p></div><Pill>To validate</Pill></div>)}</div></div>
     <div className="notice-box"><ShieldCheck size={17}/><span>Real A/B tests require baseline rates, a defined minimum detectable effect, sample-size and power calculations, platform randomization where available, and a pre-registered stopping rule. Synthetic observations cannot establish statistical market lift.</span></div>
   </div>;
