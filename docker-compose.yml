@@ -4,6 +4,9 @@ services:
       context: ./backend
     ports:
       - "8000:8000"
+    environment:
+      AI_ADS_DEMO_DATA_PATH: /app/data/synthetic_daily_metrics.csv
+      AI_ADS_DB_PATH: /app/data/growthlab.sqlite3
     volumes:
       - ./backend/app:/app/app
       - ./data:/app/data:ro
