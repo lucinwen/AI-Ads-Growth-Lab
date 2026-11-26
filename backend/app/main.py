@@ -972,6 +972,15 @@ async def upload_media_asset(
     raw = await file.read()
     if len(raw) > 100 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="Maximum upload size is 100 MB")
+    signatures = {
+        "image/png": raw.startswith(b"\\x89PNG\\r\\n\\x1a\\n"),
+        "image/jpeg": raw.startswith(b"\\xff\\xd8\\xff"),
+        "image/webp": len(raw) >= 12 and raw[:4] == b"RIFF" and raw[8:12] == b"WEBP",
+        "video/mp4": len(raw) >= 12 and raw[4:8] == b"ftyp",
+        "video/webm": raw.startswith(b"\\x1a\\x45\\xdf\\xa3"),
+    }
+    if not signatures.get(content_type, False):
+        raise HTTPException(status_code=415, detail="File content does not match its declared media type")
     with storage.connect() as db:
         creative = db.execute("SELECT workspace_id FROM creative WHERE id=?", (creative_id,)).fetchone()
         if not creative:
