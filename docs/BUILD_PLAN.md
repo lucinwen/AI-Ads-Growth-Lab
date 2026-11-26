@@ -56,7 +56,9 @@
 - [x] Creative Studio invokes Strategy Agent and saves returned concepts as drafts
 - [x] Agent Activity view displays persisted run history
 - [ ] Orchestrator and dependency-aware multi-agent task graph
-- [ ] Creative Production, Compliance, Asset QA, Analytics and Growth Advisor agents
+- [x] Creative Production Agent generates versioned scripts/storyboards/prompt briefs
+- [ ] Compliance, Asset QA, and Growth Advisor agents
+- [ ] Full Analytics Agent beyond deterministic metric API
 - [ ] Prompt/model cost tracking, retries, idempotency and structured tool traces
 - [ ] Human review workflow integrated into Agent task transitions
 
