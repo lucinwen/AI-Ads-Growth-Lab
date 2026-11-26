@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import io
 from typing import Literal
+from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field, ConfigDict
@@ -85,3 +86,100 @@ async def validate_csv(file: UploadFile = File(...), data_mode: Literal["SIMULAT
         return {"filename": file.filename, "data_mode": data_mode, "validated_rows": len(parsed), "aggregate": result}
     except (UnicodeDecodeError, csv.Error, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/v1/demo/overview")
+def demo_overview():
+    """Return the bundled synthetic experiment for the interactive portfolio demo."""
+    dataset = Path(__file__).resolve().parents[2] / "data" / "synthetic_daily_metrics.csv"
+    if not dataset.exists():
+        raise HTTPException(status_code=503, detail="Demo dataset is not available")
+
+    try:
+        with dataset.open("r", encoding="utf-8-sig", newline="") as handle:
+            reader = csv.DictReader(handle)
+            raw_rows = list(reader)
+        if not raw_rows:
+            raise ValueError("Demo dataset is empty")
+
+        parsed = []
+        for index, row in enumerate(raw_rows, start=2):
+            mode = row.get("data_mode", "").strip().upper()
+            if mode != "SIMULATED":
+                raise ValueError(f"Demo dataset row {index} must be SIMULATED")
+            parsed.append({
+                "date": row["date"],
+                "creative_id": row["creative_id"],
+                "variant": row["variant"],
+                "metric": MetricRow(
+                    data_mode=mode,
+                    impressions=int(row["impressions"]),
+                    clicks=int(row["clicks"]),
+                    landing_page_views=int(row["landing_page_views"]),
+                    add_to_cart=int(row["add_to_cart"]),
+                    purchases=int(row["purchases"]),
+                    refunded_orders=int(row["orders_refunded"]),
+                    spend_usd=float(row["spend_usd"]),
+                    attributed_revenue_usd=float(row["attributed_revenue_usd"]),
+                )
+            })
+
+        overall = aggregate_metrics([item["metric"] for item in parsed])
+        creative_groups = {}
+        daily_groups = {}
+        for item in parsed:
+            creative_groups.setdefault(item["creative_id"], []).append(item["metric"])
+            daily_groups.setdefault(item["date"], []).append(item["metric"])
+
+        creative_rows = []
+        for creative_id, group in sorted(creative_groups.items()):
+            result = aggregate_metrics(group)
+            creative_rows.append({
+                "creative_id": creative_id,
+                "concept": creative_id.rsplit("-", 1)[0],
+                "variant": creative_id.rsplit("-", 1)[1],
+                "totals": result["totals"],
+                "metrics": result["metrics"],
+            })
+
+        daily_rows = []
+        for event_date, group in sorted(daily_groups.items()):
+            result = aggregate_metrics(group)
+            daily_rows.append({
+                "date": event_date,
+                "spend_usd": result["totals"]["spend_usd"],
+                "revenue_usd": result["totals"]["attributed_revenue_usd"],
+                "impressions": result["totals"]["impressions"],
+                "clicks": result["totals"]["clicks"],
+                "purchases": result["totals"]["purchases"],
+                "roas": result["metrics"]["roas"],
+                "ctr": result["metrics"]["ctr"],
+            })
+
+        funnel = [
+            {"stage": "Impressions", "value": overall["totals"]["impressions"]},
+            {"stage": "Clicks", "value": overall["totals"]["clicks"]},
+            {"stage": "Landing page views", "value": overall["totals"]["landing_page_views"]},
+            {"stage": "Add to cart", "value": overall["totals"]["add_to_cart"]},
+            {"stage": "Purchases", "value": overall["totals"]["purchases"]},
+        ]
+        return {
+            "experiment_id": "EXP-US-BEAUTY-001",
+            "workspace": "Luma Dew / US Beauty Demo",
+            "data_mode": "SIMULATED",
+            "source": "bundled_synthetic_dataset",
+            "date_range": {"start": min(daily_groups), "end": max(daily_groups)},
+            "row_count": len(parsed),
+            "creative_count": len(creative_rows),
+            "summary": overall,
+            "daily": daily_rows,
+            "creatives": creative_rows,
+            "funnel": funnel,
+            "limitations": [
+                "All records are synthetic and do not represent actual TikTok or Meta delivery.",
+                "Descriptive differences are not causal evidence or proof of market lift.",
+                "ROAS is attributed revenue divided by spend; it is not profit or ROI."
+            ]
+        }
+    except (KeyError, ValueError, TypeError) as exc:
+        raise HTTPException(status_code=500, detail=f"Demo dataset validation failed: {exc}") from exc
