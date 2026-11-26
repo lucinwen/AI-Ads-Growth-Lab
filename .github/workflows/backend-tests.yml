@@ -5,6 +5,10 @@ on:
       - "backend/**"
       - "frontend/**"
       - ".github/workflows/backend-tests.yml"
+      - "docker-compose.yml"
+      - "backend/Dockerfile"
+      - "frontend/Dockerfile"
+      - ".env.example"
   pull_request:
     paths:
       - "backend/**"
@@ -39,3 +43,10 @@ jobs:
           node-version: "20"
       - run: npm install
       - run: npm run build
+
+  compose-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Docker Compose configuration
+        run: docker compose config --quiet
