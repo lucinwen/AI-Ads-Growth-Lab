@@ -17,7 +17,8 @@ from .metrics import MetricRow, aggregate_metrics
 from . import storage
 from .schemas import (WorkspaceCreate, ProductCreate, ClaimCreate, CreativeCreate, AssetVersionCreate, ExperimentCreate, VariantCreate)
 
-app = FastAPI(title="AI Ads Growth Lab API", version="0.3.0")
+app = FastAPI(title="AI Ads Growth Lab API", version="0.4.0")
+storage.init_db()
 
 @app.on_event("startup")
 def initialize_storage():
