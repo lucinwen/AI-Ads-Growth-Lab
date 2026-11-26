@@ -67,18 +67,6 @@ def test_demo_overview_endpoint():
     assert "synthetic" in payload["limitations"][0].lower()
 
 
-def test_demo_overview_endpoint():
-    response = client.get("/v1/demo/overview")
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["data_mode"] == "SIMULATED"
-    assert payload["row_count"] == 84
-    assert payload["creative_count"] == 12
-    assert len(payload["daily"]) == 7
-    assert len(payload["funnel"]) == 5
-    assert "synthetic" in payload["limitations"][0].lower()
-
-
 def test_demo_overview_is_cors_accessible_from_local_frontend():
     response = client.options(
         "/v1/demo/overview",
@@ -307,3 +295,20 @@ def test_creative_production_agent_persists_storyboard(monkeypatch):
     drafts = client.get("/v1/creatives/demo-creative-routine/production-drafts")
     assert drafts.status_code == 200
     assert drafts.json()[0]["status"] == "DRAFT_REQUIRES_REVIEW"
+
+
+def test_demo_experiment_comparison_endpoint():
+    response = client.get("/v1/demo/experiment/compare?control_family=C-A&treatment_family=C-B&metric=CTR&mde_absolute=0.005")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["data_mode"] == "SIMULATED"
+    assert payload["metric"] == "CTR"
+    assert payload["analysis"]["control"]["trials"] > 0
+    assert payload["analysis"]["treatment"]["trials"] > 0
+    assert payload["analysis"]["decision"] in {"PROMISING", "UNDERPERFORMING", "INCONCLUSIVE", "INSUFFICIENT_SAMPLE"}
+    assert "synthetic" in payload["decision_note"].lower()
+
+
+def test_demo_experiment_comparison_rejects_same_family():
+    response = client.get("/v1/demo/experiment/compare?control_family=C-A&treatment_family=C-A")
+    assert response.status_code == 422
