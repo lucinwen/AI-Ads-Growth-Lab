@@ -27,3 +27,29 @@ def test_mode_mismatch_rejected():
     ]}
     response = client.post("/v1/metrics/aggregate", json=payload)
     assert response.status_code == 422
+
+
+def test_csv_validation_endpoint():
+    csv_body = (
+        "data_mode,impressions,clicks,landing_page_views,add_to_cart,purchases,refunded_orders,spend_usd,attributed_revenue_usd\n"
+        "SIMULATED,1000,20,18,5,2,0,20,60\n"
+    )
+    response = client.post(
+        "/v1/import/csv/validate?data_mode=SIMULATED",
+        files={"file": ("metrics.csv", csv_body, "text/csv")}
+    )
+    assert response.status_code == 200
+    assert response.json()["validated_rows"] == 1
+    assert response.json()["aggregate"]["metrics"]["roas"] == 3
+
+
+def test_csv_mode_mismatch_rejected():
+    csv_body = (
+        "data_mode,impressions,clicks,landing_page_views,add_to_cart,purchases,refunded_orders,spend_usd,attributed_revenue_usd\n"
+        "REAL,1000,20,18,5,2,0,20,60\n"
+    )
+    response = client.post(
+        "/v1/import/csv/validate?data_mode=SIMULATED",
+        files={"file": ("metrics.csv", csv_body, "text/csv")}
+    )
+    assert response.status_code == 422
