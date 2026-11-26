@@ -6,10 +6,11 @@ services:
       - "8000:8000"
     environment:
       AI_ADS_DEMO_DATA_PATH: /app/data/synthetic_daily_metrics.csv
-      AI_ADS_DB_PATH: /app/data/growthlab.sqlite3
+      AI_ADS_DB_PATH: /app/runtime-data/growthlab.sqlite3
     volumes:
       - ./backend/app:/app/app
       - ./data:/app/data:ro
+      - ./runtime-data:/app/runtime-data
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s
