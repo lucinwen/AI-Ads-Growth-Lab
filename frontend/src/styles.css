@@ -7,3 +7,5 @@
 
 .claim-form{display:grid;grid-template-columns:minmax(0,1fr) 170px auto;gap:8px;margin:14px 0 10px}.claim-form input,.claim-form select{min-width:0;border:1px solid #e5eaed;border-radius:7px;padding:9px 10px;font-size:9px;color:#405966;background:#fff;outline:none}.claim-form input:focus,.claim-form select:focus{border-color:#8dc7bd}.claim-list{display:flex;flex-direction:column}.claim-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 2px;border-top:1px solid #f0f2f3}.claim-row>div{display:flex;flex-direction:column;gap:4px}.claim-row strong{font-size:9px;color:#415966}.claim-row span{font-size:8px;color:#98a4aa}
 @media(max-width:700px){.claim-form{grid-template-columns:1fr}.claim-form select{width:100%}}
+
+.section-actions{display:flex;align-items:center;gap:8px}.section-actions .button{padding:8px 11px;font-size:9px}
