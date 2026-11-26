@@ -402,7 +402,7 @@ function AgentsPage({workspaceId}:{workspaceId:string}) {
       .catch(err=>setRunError(String(err.message||err)));
   },[workspaceId]);
   const agents=[
-    ["Strategy Agent","Creative angles, hooks and testable hypotheses","SPEC DEFINED","blue"],
+    ["Strategy Agent","Creative angles, hooks and testable hypotheses","IMPLEMENTED · PROVIDER CONFIG","green"],
     ["Creative Production Agent","Scripts, storyboards, prompts and asset manifests","SPEC DEFINED","blue"],
     ["Compliance Agent","Claims, evidence, rights and policy precheck","HUMAN GATE","amber"],
     ["Asset QA Agent","Technical specs, brand consistency and review","SPEC DEFINED","blue"],
