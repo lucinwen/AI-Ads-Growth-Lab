@@ -215,6 +215,29 @@ function CreativePage({drafts,setDrafts,newHook,setNewHook,notify,workspaceId,pr
   drafts:{id:string;title:string;angle:string;hook:string;hypothesis:string;format:string;status:string}[];
   setDrafts:(v:any)=>void;newHook:string;setNewHook:(v:string)=>void;notify:(s:string)=>void;workspaceId:string;productId:string;
 }) {
+  const [agentRunning,setAgentRunning] = useState(false);
+  const [agentRunMessage,setAgentRunMessage] = useState("");
+  async function runStrategyAgent() {
+    if(!workspaceId||!productId)return;
+    setAgentRunning(true);setAgentRunMessage("");
+    try {
+      const response=await fetch(`${API}/v1/agents/creative-strategy/run`,{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          workspace_id:workspaceId,product_id:productId,
+          audience_hypothesis:"Adults in the United States exploring everyday moisturizer and skincare routines.",
+          campaign_objective:"CONVERSION",concept_count:4,language:"en-US"
+        })
+      });
+      const result=await response.json();
+      if(!response.ok)throw new Error(result.detail||"Strategy Agent run failed");
+      const saved=await fetch(`${API}/v1/workspaces/${workspaceId}/creatives`).then(r=>r.json());
+      setDrafts(saved.map((row:any)=>({id:row.id,title:row.concept_name,angle:row.angle||"Unspecified",hook:row.hook||"",hypothesis:row.hypothesis||"",format:row.format||"Draft",status:"Saved in workspace"})));
+      setAgentRunMessage(`Run ${result.run_id.slice(0,8)} completed with ${result.concepts.length} draft concepts using ${result.model}. Human review required.`);
+    } catch(err) {
+      setAgentRunMessage(String((err as Error).message||err));
+    } finally {setAgentRunning(false);}
+  }
   const [claims,setClaims] = useState<any[]>([]);
   const [claimText,setClaimText] = useState("");
   const [claimType,setClaimType] = useState("product_attribute");
@@ -262,8 +285,8 @@ function CreativePage({drafts,setDrafts,newHook,setNewHook,notify,workspaceId,pr
   }
   return <div className="page-stack">
     <div className="creative-intro panel"><div className="intro-symbol"><WandSparkles size={24}/></div><div><h3>From product facts to testable creative hypotheses</h3><p>Draft distinct creative routes before generating assets. Every objective claim must be linked to evidence before an asset can enter review.</p></div><Pill tone="amber">Strategy workspace</Pill></div>
-    <SectionTitle title="Creative routes" desc="Four differentiated directions for the fictional Luma Dew moisturizer." action={<Pill tone="green">4 concepts</Pill>}/>
-    <div className="concept-grid">{drafts.map((d,i)=><div className="concept-card" key={d.id}><div className="concept-top"><span className={`concept-number n-${i}`}>0{i+1}</span><Pill tone={d.status.includes("Needs")?"amber":"neutral"}>{d.status}</Pill></div><div className={`concept-art art-${i}`}><div className="art-bottle"/><span>{["DAILY RITUAL","TEXTURE NOTES","FORMULA / FACTS","REAL-LIFE ROUTINE"][i]}</span></div><div className="concept-body"><span className="concept-angle">{d.angle}</span><h3>{d.title}</h3><blockquote>“{d.hook}”</blockquote><p>{d.hypothesis}</p><div className="concept-foot"><span><Image size={14}/>{d.format}</span><button onClick={()=>notify("Concept detail editor is queued for the next milestone.")}>View brief <ArrowUpRight size={14}/></button></div></div></div>)}</div>
+    <SectionTitle title="Creative routes" desc="Four differentiated directions for the fictional Luma Dew moisturizer." action={<div className="section-actions"><Pill tone="green">{drafts.length} saved concepts</Pill><button className="button button-primary" onClick={runStrategyAgent} disabled={agentRunning||!workspaceId}><Bot size={15}/>{agentRunning?"Running Agent…":"Generate with Agent"}</button></div>}/>
+    {agentRunMessage&&<div className="import-result">{agentRunMessage}</div>}\n    <div className="concept-grid">{drafts.map((d,i)=><div className="concept-card" key={d.id}><div className="concept-top"><span className={`concept-number n-${i}`}>0{i+1}</span><Pill tone={d.status.includes("Needs")?"amber":"neutral"}>{d.status}</Pill></div><div className={`concept-art art-${i}`}><div className="art-bottle"/><span>{["DAILY RITUAL","TEXTURE NOTES","FORMULA / FACTS","REAL-LIFE ROUTINE"][i]}</span></div><div className="concept-body"><span className="concept-angle">{d.angle}</span><h3>{d.title}</h3><blockquote>“{d.hook}”</blockquote><p>{d.hypothesis}</p><div className="concept-foot"><span><Image size={14}/>{d.format}</span><button onClick={()=>notify("Concept detail editor is queued for the next milestone.")}>View brief <ArrowUpRight size={14}/></button></div></div></div>)}</div>
     <div className="panel quick-draft"><div><h3><Plus size={17}/> Add a creative hypothesis</h3><p>Save a new hook as a local draft. This does not call a generation model.</p></div><div className="draft-form"><input value={newHook} onChange={e=>setNewHook(e.target.value)} placeholder="Write an English hook or creative angle…"/><button className="button button-primary" disabled={!newHook.trim() || !workspaceId} onClick={saveCreativeDraft}><Plus size={15}/> Save draft</button></div></div>
     <div className="panel claim-panel">
       <div className="panel-head"><div><h3>Product claim registry</h3><p>Only evidence-backed claims may move into approved ad copy.</p></div><Pill tone="amber">Evidence gate</Pill></div>
