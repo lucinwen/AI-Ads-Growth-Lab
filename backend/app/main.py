@@ -14,7 +14,7 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, ConfigDict
 
-from .metrics import MetricRow, aggregate_metrics
+from .metrics import MetricRow, aggregate_metrics, compare_proportions
 from . import storage
 from .schemas import (WorkspaceCreate, ProductCreate, ClaimCreate, ClaimReviewCreate, CreativeCreate, AssetVersionCreate, AssetReviewCreate, ExperimentCreate, VariantCreate, StrategyRunRequest, ProductionRunRequest)
 from .agents import generate_creative_strategy, generate_production_brief
@@ -686,3 +686,62 @@ def list_production_drafts(creative_id: str):
             result["production"] = json.loads(result.pop("production_json"))
             results.append(result)
         return results
+
+
+@app.get("/v1/demo/experiment/compare")
+def compare_demo_creative_families(
+    control_family: str = "C-A",
+    treatment_family: str = "C-B",
+    metric: Literal["CTR", "CVR"] = "CTR",
+    mde_absolute: float | None = None,
+):
+    """Compare two synthetic creative families using a two-proportion test."""
+    if control_family == treatment_family:
+        raise HTTPException(status_code=422, detail="Control and treatment families must differ")
+    if not control_family.startswith("C-") or not treatment_family.startswith("C-"):
+        raise HTTPException(status_code=422, detail="Creative family IDs must use the C-X format")
+    dataset = Path(os.getenv("AI_ADS_DEMO_DATA_PATH", str(Path(__file__).resolve().parents[2] / "data" / "synthetic_daily_metrics.csv")))
+    if not dataset.exists():
+        raise HTTPException(status_code=503, detail="Demo dataset is not available")
+    totals = {
+        control_family: {"successes": 0, "trials": 0, "rows": 0},
+        treatment_family: {"successes": 0, "trials": 0, "rows": 0},
+    }
+    try:
+        with dataset.open("r", encoding="utf-8-sig", newline="") as handle:
+            for row in csv.DictReader(handle):
+                creative_id = row.get("creative_id", "")
+                family = "-".join(creative_id.split("-")[:2])
+                if family not in totals:
+                    continue
+                if row.get("data_mode", "").upper() != "SIMULATED":
+                    raise ValueError("Demo comparison only accepts SIMULATED records")
+                if metric == "CTR":
+                    successes, trials = int(row["clicks"]), int(row["impressions"])
+                else:
+                    successes, trials = int(row["purchases"]), int(row["clicks"])
+                totals[family]["successes"] += successes
+                totals[family]["trials"] += trials
+                totals[family]["rows"] += 1
+        if not totals[control_family]["rows"] or not totals[treatment_family]["rows"]:
+            raise ValueError("No matching creative family rows found")
+        result = compare_proportions(
+            control_successes=totals[control_family]["successes"],
+            control_trials=totals[control_family]["trials"],
+            treatment_successes=totals[treatment_family]["successes"],
+            treatment_trials=totals[treatment_family]["trials"],
+            mde_absolute=mde_absolute,
+        )
+        return {
+            "data_mode": "SIMULATED",
+            "experiment_id": "EXP-US-BEAUTY-001",
+            "metric": metric,
+            "control_family": control_family,
+            "treatment_family": treatment_family,
+            "control_rows": totals[control_family]["rows"],
+            "treatment_rows": totals[treatment_family]["rows"],
+            "analysis": result,
+            "decision_note": "This is a statistical workflow demonstration on synthetic aggregate records, not a valid real-world randomized experiment or evidence of causal lift.",
+        }
+    except (KeyError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
