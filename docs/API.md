@@ -21,6 +21,8 @@ The current local runtime uses SQLite for persistence. The PostgreSQL schema is 
 - `POST /v1/experiments/{experiment_id}/variants` / `GET /v1/experiments/{experiment_id}/variants`
 - `GET /v1/workspaces/{workspace_id}/audit`
 - `POST /v1/agents/creative-strategy/run` — calls the configured OpenAI-compatible model, validates structured concepts, persists drafts and an AgentRun trace.
+- `POST /v1/agents/creative-production/run` — generates a script/storyboard/shot and prompt brief for a saved creative; persists versioned production drafts.
+- `GET /v1/creatives/{creative_id}/production-drafts` — lists saved production brief versions.
 - `GET /v1/workspaces/{workspace_id}/agent-runs` — lists persisted Agent execution records.
 
 ### Guardrails
@@ -54,4 +56,4 @@ Copy the root `.env.example` to `.env` and set `OPENAI_API_KEY`. Optional settin
 - `OPENAI_BASE_URL` (default: `https://api.openai.com/v1`)
 - `OPENAI_MODEL` (default: `gpt-4.1-mini`)
 
-The provider key is read from the process environment and is never written to SQLite. The Strategy Agent receives only product facts and VERIFIED claims. If no verified claims exist, the prompt explicitly forbids inventing product efficacy, clinical outcomes, testimonials or endorsements. Generated concepts are saved as drafts and require human review. The endpoint does not generate final image/video assets, publish ads or spend budget.
+The provider key is read from the process environment and is never written to SQLite. Strategy and Production Agents receive only product facts and VERIFIED claims. If no verified claims exist, the prompt explicitly forbids inventing product efficacy, clinical outcomes, testimonials or endorsements. Generated concepts are saved as drafts and require human review. The endpoint does not generate final image/video assets, publish ads or spend budget.
