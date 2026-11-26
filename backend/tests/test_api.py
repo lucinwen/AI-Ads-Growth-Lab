@@ -323,3 +323,66 @@ def test_demo_data_quality_audit_passes_seed_dataset():
     assert payload["unique_grain_count"] == 84
     assert payload["issue_count"] == 0
     assert payload["data_mode"] == "SIMULATED"
+
+
+def test_media_upload_library_review_and_export(tmp_path, monkeypatch):
+    import app.main as main_module
+    main_module.media.MEDIA_ROOT = tmp_path
+    main_module.media.PUBLIC_BASE = "http://testserver"
+
+    upload = client.post(
+        "/v1/media-assets/upload",
+        data={"creative_id":"demo-creative-routine","label":"test-image"},
+        files={"file":("tiny.png",b"fake-png-bytes","image/png")}
+    )
+    assert upload.status_code == 201
+    asset = upload.json()
+    assert asset["asset_type"] == "IMAGE"
+    assert asset["status"] == "UPLOADED"
+    assert (tmp_path / asset["local_filename"]).read_bytes() == b"fake-png-bytes"
+
+    listed = client.get("/v1/creatives/demo-creative-routine/media-assets")
+    assert listed.status_code == 200
+    assert any(item["id"] == asset["id"] for item in listed.json())
+
+    review = client.post(f"/v1/media-assets/{asset['id']}/review", json={
+        "reviewer_id":"creative-reviewer","decision":"APPROVED","reason":"Visual inspection complete."
+    })
+    assert review.status_code == 201
+    assert client.get(f"/v1/media-assets/{asset['id']}").json()["status"] == "APPROVED"
+
+    exported = client.post("/v1/media-assets/export", json=[asset["id"]])
+    assert exported.status_code == 200
+    assert exported.headers["content-type"] == "application/zip"
+    import io, zipfile
+    archive = zipfile.ZipFile(io.BytesIO(exported.content))
+    assert "manifest.json" in archive.namelist()
+    assert any(name.startswith("assets/") for name in archive.namelist())
+
+
+def test_image_generation_requires_provider_configuration(monkeypatch):
+    import app.main as main_module
+    async def missing_key(*args, **kwargs):
+        raise RuntimeError("OPENAI_API_KEY is required for real image generation.")
+    monkeypatch.setattr(main_module.media, "generate_image", missing_key)
+    response = client.post("/v1/media-assets/generate-image", json={
+        "creative_id":"demo-creative-routine",
+        "prompt":"Premium skincare product photography on a clean studio background, soft daylight, no extra text.",
+        "size":"1024x1536","quality":"high"
+    })
+    assert response.status_code == 503
+    assert "OPENAI_API_KEY" in response.json()["detail"]
+
+
+def test_video_generation_requires_replicate_configuration(monkeypatch):
+    import app.main as main_module
+    async def missing_provider(*args, **kwargs):
+        raise RuntimeError("Set REPLICATE_API_TOKEN and REPLICATE_MODEL=owner/model to enable video generation.")
+    monkeypatch.setattr(main_module.media, "start_video", missing_provider)
+    response = client.post("/v1/media-assets/generate-video", json={
+        "creative_id":"demo-creative-routine",
+        "prompt":"Vertical premium skincare product film, slow camera movement, clean studio lighting.",
+        "aspect_ratio":"9:16","duration_sec":5
+    })
+    assert response.status_code == 503
+    assert "REPLICATE_API_TOKEN" in response.json()["detail"]
