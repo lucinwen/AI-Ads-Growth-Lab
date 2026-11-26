@@ -37,3 +37,35 @@ def test_simulated_and_real_cannot_mix():
 def test_negative_values_rejected():
     with pytest.raises(ValueError, match="non-negative"):
         aggregate_metrics([row(clicks=-1)])
+
+
+def test_two_proportion_test_detects_large_difference():
+    from app.metrics import compare_proportions
+    result = compare_proportions(
+        control_successes=100, control_trials=10000,
+        treatment_successes=180, treatment_trials=10000,
+        minimum_trials_per_arm=1000, mde_absolute=0.005,
+    )
+    assert result["decision"] == "PROMISING"
+    assert result["p_value"] < 0.05
+    assert result["absolute_difference"] == pytest.approx(0.008)
+    assert result["planning"]["approx_required_sample_per_arm_80pct_power"] > 0
+
+
+def test_two_proportion_test_marks_small_sample_inconclusive():
+    from app.metrics import compare_proportions
+    result = compare_proportions(
+        control_successes=10, control_trials=100,
+        treatment_successes=20, treatment_trials=100,
+        minimum_trials_per_arm=1000,
+    )
+    assert result["decision"] == "INSUFFICIENT_SAMPLE"
+
+
+def test_two_proportion_test_rejects_invalid_counts():
+    from app.metrics import compare_proportions
+    with pytest.raises(ValueError, match="successes"):
+        compare_proportions(
+            control_successes=101, control_trials=100,
+            treatment_successes=20, treatment_trials=100,
+        )
