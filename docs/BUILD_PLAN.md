@@ -3,7 +3,9 @@
 ## P0 — Analytics foundation
 - [x] Initialize repository and project documentation
 - [x] Deterministic metric engine (aggregation API + zero-denominator handling)
-- [x] CSV schema validation and SIMULATED/REAL isolation\n- [x] Deterministic row-grain, numeric and event-funnel data quality audit endpoint\n- [x] Overview UI surfaces data quality status and detected issues
+- [x] CSV schema validation and SIMULATED/REAL isolation
+- [x] Deterministic row-grain, numeric and event-funnel data quality audit endpoint
+- [x] Overview UI surfaces data quality status and detected issues
 - [x] Synthetic seed CSV (84 daily rows / 12 variants / 7 days)
 - [x] Pytest unit/API smoke tests passing in GitHub Actions
 - [x] FastAPI health, aggregation, CSV validation, and demo overview endpoints
@@ -20,6 +22,7 @@
 - [x] Docker Compose frontend + backend services
 - [x] GitHub Actions backend tests, frontend production build and Docker Compose config validation
 - [ ] Browser-level visual QA and responsive screenshots
+- [ ] Real provider smoke test using user-owned API credentials
 
 ## P2 — Persistent product data
 - [x] SQLite local persistence layer and idempotent demo seed
@@ -46,7 +49,12 @@
 - [x] Creative Production Agent generates structured scripts, storyboards, camera directions and asset prompts
 - [x] Production brief versions persist per creative and are visible in Creative Studio
 - [ ] Editable script / storyboard / prompt editor with version history
-- [ ] Asset upload, storage, preview, and version comparison
+- [x] OpenAI Images API integration with local file persistence and media metadata
+- [x] Optional Replicate async video generation adapter with job refresh and local retrieval
+- [x] Image/video upload with file-size and signature checks
+- [x] Media asset library, side-by-side comparison and human review UI
+- [x] ZIP export with JSON asset manifest
+- [ ] Provider-specific input schema adapters, generation cost telemetry and retry queue
 - [ ] Compliance precheck linked to Claim Registry; block high-risk creative before READY_TO_TEST
 
 ## P4 — Agent workflow
@@ -63,9 +71,16 @@
 - [ ] Human review workflow integrated into Agent task transitions
 
 ## P5 — Experiment analytics
-- [x] Experiment Builder persists experiment definitions and creative variants\n- [x] MDE input and approximate sample planning exposed in statistical comparison\n- [ ] Full pre-registration, baseline assumptions, and stopping-rule workflow
+- [x] Experiment Builder persists experiment definitions and creative variants
+- [x] MDE input and approximate sample planning exposed in statistical comparison
+- [ ] Full pre-registration, baseline assumptions, and stopping-rule workflow
 - [ ] Persistent CSV import UI with field mapping, import history and data-quality diagnostics for user-supplied datasets
-- [x] Creative family comparison endpoint for CTR and click-to-purchase CVR\n- [x] Two-proportion z-test, Wilson arm intervals, difference interval and sample sufficiency guardrail\n- [x] Approximate 80% power / MDE sample planning\n- [x] Growth Insights UI for selectable control/treatment families and metric\n- [ ] Real-data sequential testing, multiple-comparison correction and experiment stopping rules\n- [ ] Creative breakdowns, funnel analysis, and confidence intervals
+- [x] Creative family comparison endpoint for CTR and click-to-purchase CVR
+- [x] Two-proportion z-test, Wilson arm intervals, difference interval and sample sufficiency guardrail
+- [x] Approximate 80% power / MDE sample planning
+- [x] Growth Insights UI for selectable control/treatment families and metric
+- [ ] Real-data sequential testing, multiple-comparison correction and experiment stopping rules
+- [ ] Creative breakdowns, funnel analysis, and confidence intervals
 - [ ] Analytics Agent cites metric snapshots and data limitations
 - [ ] Exportable experiment report and portfolio case study
 
