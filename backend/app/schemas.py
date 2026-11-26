@@ -90,3 +90,10 @@ class StrategyRunRequest(StrictModel):
     campaign_objective: Literal["AWARENESS", "TRAFFIC", "CONVERSION", "CONSIDERATION"] = "CONVERSION"
     concept_count: int = Field(default=4, ge=2, le=8)
     language: str = "en-US"
+
+
+class ClaimReviewCreate(StrictModel):
+    reviewer_id: str = Field(min_length=2, max_length=120)
+    decision: Literal["VERIFIED", "UNVERIFIED", "PROHIBITED", "NEEDS_REVIEW"]
+    evidence_refs: list[str] = Field(default_factory=list)
+    reason: str = Field(min_length=3, max_length=1000)
