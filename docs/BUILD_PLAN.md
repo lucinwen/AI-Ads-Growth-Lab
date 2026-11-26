@@ -63,9 +63,9 @@
 - [ ] Human review workflow integrated into Agent task transitions
 
 ## P5 — Experiment analytics
-- [ ] Experiment Builder with pre-registration, MDE, power, and stopping rules
+- [x] Experiment Builder persists experiment definitions and creative variants\n- [x] MDE input and approximate sample planning exposed in statistical comparison\n- [ ] Full pre-registration, baseline assumptions, and stopping-rule workflow
 - [ ] CSV import UI with field mapping and data-quality diagnostics
-- [ ] Creative breakdowns, funnel analysis, and confidence intervals
+- [x] Creative family comparison endpoint for CTR and click-to-purchase CVR\n- [x] Two-proportion z-test, Wilson arm intervals, difference interval and sample sufficiency guardrail\n- [x] Approximate 80% power / MDE sample planning\n- [x] Growth Insights UI for selectable control/treatment families and metric\n- [ ] Real-data sequential testing, multiple-comparison correction and experiment stopping rules\n- [ ] Creative breakdowns, funnel analysis, and confidence intervals
 - [ ] Analytics Agent cites metric snapshots and data limitations
 - [ ] Exportable experiment report and portfolio case study
 
