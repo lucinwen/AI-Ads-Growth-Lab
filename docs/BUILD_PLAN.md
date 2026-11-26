@@ -30,7 +30,8 @@
 - [x] Audit log for create, variant and review operations
 - [x] Separate asset review endpoint; new versions always start PENDING
 - [ ] PostgreSQL connection and migrations (SQLite is current local runtime)
-- [ ] Claim reviewer identity, timestamp and full review history
+- [x] Claim review records with reviewer, decision, evidence references, reason and timestamp
+- [ ] Claim review UI and reviewer identity/access control
 - [ ] Asset rights manifest and immutable approval transitions
 - [ ] Import batch persistence, deduplication and validation report history
 - [ ] Persisted AgentRun trace model
