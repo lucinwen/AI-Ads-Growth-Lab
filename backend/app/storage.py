@@ -5,6 +5,9 @@ import os
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parents[2] / '.env')
 from typing import Any, Iterator
 
 DEFAULT_DB = Path(__file__).resolve().parents[1] / "growthlab.sqlite3"
