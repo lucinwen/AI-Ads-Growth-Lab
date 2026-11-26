@@ -191,3 +191,11 @@ def test_asset_version_requires_separate_human_review():
     assert review.json()["decision"] == "NEEDS_CHANGES"
     versions = client.get(f"/v1/creatives/{creative['id']}/assets").json()
     assert versions[0]["approval_status"] == "NEEDS_CHANGES"
+
+
+def test_demo_workspace_is_seeded_with_persistent_creatives():
+    overview = client.get("/v1/demo/overview").json()
+    workspace_id = overview["workspace_id"]
+    response = client.get("/v1/workspaces/" + workspace_id + "/creatives")
+    assert response.status_code == 200
+    assert len(response.json()) == 4
