@@ -1,7 +1,7 @@
 # Portfolio Case Study — AI Ads Growth Lab
 
 ## One-line summary
-Designed and implemented an AI-assisted creative strategy and advertising measurement workspace for a fictional US skincare brand, connecting persistent product/claim data, creative hypotheses, human review, experiment configuration, deterministic metric analysis, and a configurable Strategy Agent.
+Designed and implemented an AI-assisted creative strategy and advertising measurement workspace for a fictional US skincare brand, connecting persistent product/claim data, creative hypotheses, human review, experiment configuration, deterministic metric analysis, and configurable Strategy and Production Agents.
 
 ## Problem framing
 AIGC can increase the supply of advertising creatives, but production volume alone does not prove business value. Teams need a traceable way to connect:
@@ -47,7 +47,7 @@ No automatic ad publishing, budget changes or campaign operations are implemente
 - Claim Registry can add unverified product claims.
 - Experiment Builder can save an experiment and attach the four creative hypotheses as variants.
 - Asset versions default to PENDING and have a separate human-review endpoint.
-- Configurable Creative Strategy Agent uses an OpenAI-compatible chat-completions endpoint, validates structured output and persists returned concepts as drafts.
+- Configurable Creative Strategy Agent uses an OpenAI-compatible chat-completions endpoint, validates structured output and persists returned concepts as drafts.\n- Configurable Creative Production Agent generates versioned scripts, storyboards, camera directions and asset prompts from a saved creative concept.
 - AgentRun records retain status, model, input/output references, latency and error information.
 - Dashboard aggregates the bundled synthetic dataset by date, creative and funnel stage.
 - CSV validation endpoint rejects data-mode mismatch.
