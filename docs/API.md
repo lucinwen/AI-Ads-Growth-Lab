@@ -4,7 +4,7 @@ Base URL: `http://localhost:8000`
 
 ## Health and demo
 - `GET /health` — service health.
-- `GET /v1/demo/overview` — bundled synthetic experiment aggregated by date, creative, and funnel stage. Includes seeded demo workspace/product IDs.\n- `GET /v1/demo/experiment/compare?control_family=C-A&treatment_family=C-B&metric=CTR&mde_absolute=0.005` — synthetic creative-family comparison with two-proportion z-test, Wilson intervals, sample sufficiency and approximate sample planning.
+- `GET /v1/demo/overview` — bundled synthetic experiment aggregated by date, creative, and funnel stage. Includes seeded demo workspace/product IDs.\n- `GET /v1/demo/experiment/compare?control_family=C-A&treatment_family=C-B&metric=CTR&mde_absolute=0.005` — synthetic creative-family comparison with two-proportion z-test, Wilson intervals, sample sufficiency and approximate sample planning.\n- `GET /v1/demo/data-quality` — row-grain, missing-field, numeric, data-mode and funnel-monotonicity audit for the bundled dataset.
 
 ## Persistent workspace APIs
 
