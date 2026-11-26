@@ -7,10 +7,15 @@ AI-powered creative production and growth analytics workspace for the US beauty 
 ## Current implementation status
 
 ### Implemented
-- Responsive React + TypeScript dashboard with Overview, Creative Studio, Experiments, Growth Insights, and Agent Activity views.
+- Responsive React + TypeScript dashboard with Overview, Creative Strategy, Creative Production Studio, Experiments, Growth Insights, and Agent Activity views.
 - FastAPI health, deterministic metric aggregation, CSV validation, demo overview, and persistent workspace APIs.
 - SQLite local persistence for workspaces, products, claims, creatives, asset versions, experiments, variants, AgentRun traces, reviews, and audit events.
-- Configurable Creative Strategy and Creative Production Agents using an OpenAI-compatible chat-completions endpoint; structured concepts, scripts, storyboards and prompts are validated and persisted as human-reviewable drafts.\n- Statistical experiment comparison API and Growth Insights UI with CTR/CVR two-proportion testing, confidence intervals, sample sufficiency and approximate MDE planning.\n- Deterministic data-quality audit for duplicate row grain, invalid numeric values, data-mode drift and impossible funnel transitions.
+- Configurable Creative Strategy and Creative Production Agents using an OpenAI-compatible chat-completions endpoint; structured concepts, scripts, storyboards and prompts are validated and persisted as human-reviewable drafts.
+- Real image generation through the OpenAI Images API, with generated files stored locally and registered with provider/model/prompt metadata.
+- Optional asynchronous video generation through a configured Replicate model, including status refresh and local video retrieval.
+- Media upload, asset library, side-by-side comparison, human review, and ZIP export with JSON manifest.
+- Statistical experiment comparison API and Growth Insights UI with CTR/CVR two-proportion testing, confidence intervals, sample sufficiency and approximate MDE planning.
+- Deterministic data-quality audit for duplicate row grain, invalid numeric values, data-mode drift and impossible funnel transitions.
 - Idempotently seeded fictional Luma Dew demo workspace; Creative Studio saves new hypotheses to the database.
 - Demo overview aggregation by creative, date, and funnel stage.
 - Explicit SIMULATED / REAL data-mode isolation in aggregation and CSV validation.
@@ -21,7 +26,7 @@ AI-powered creative production and growth analytics workspace for the US beauty 
 ### Not implemented yet
 - PostgreSQL integration and migrations; SQLite is currently the local persistence adapter.
 - Multi-agent orchestration beyond the current Strategy and Production Agent endpoints; Compliance and Asset QA agents are not yet executable.
-- Final image/video generation, asset upload and storage pipeline.
+- Production-grade image/video provider selection, cost telemetry, retries and generation queue; current image provider and configurable Replicate video adapter are implemented.
 - Real ad account connectors or live campaign operations.
 - Real campaign results or causal growth evidence.
 
@@ -31,7 +36,7 @@ Requires Docker Compose, or Python 3.11+ and Node.js 20+.
 
 ### Configure optional Creative Strategy Agent
 
-Copy `.env.example` to `.env` and add your own `OPENAI_API_KEY`. You may also change `OPENAI_BASE_URL` and `OPENAI_MODEL`. The key is not committed or stored in the database.
+Copy `.env.example` to `.env` and add your own `OPENAI_API_KEY`. This enables the chat agents and OpenAI Images API. Set `OPENAI_IMAGE_MODEL` if needed. For video, also set `REPLICATE_API_TOKEN` and `REPLICATE_MODEL=owner/model`; the chosen model must accept `prompt`, `aspect_ratio`, and `duration` inputs. Keys are not committed or stored in SQLite.
 
 ### Docker Compose (recommended)
 
@@ -71,8 +76,15 @@ npm run dev
 ## API endpoints
 
 - `GET /health`
-- `GET /v1/demo/overview` — aggregated demo data for dashboard views\n- `GET /v1/demo/experiment/compare` — synthetic creative-family significance comparison\n- `GET /v1/demo/data-quality` — deterministic data quality and funnel integrity report
+- `GET /v1/demo/overview` — aggregated demo data for dashboard views
+- `GET /v1/demo/experiment/compare` — synthetic creative-family significance comparison
+- `GET /v1/demo/data-quality` — deterministic data quality and funnel integrity report
 - `POST /v1/agents/creative-strategy/run` — generate and persist structured creative concept drafts (requires provider configuration)
+- `POST /v1/media-assets/generate-image` — generate and persist a real image
+- `POST /v1/media-assets/generate-video` — start an asynchronous Replicate video job
+- `GET /v1/creatives/{creative_id}/media-assets` — list generated and uploaded media
+- `POST /v1/media-assets/upload` — upload an image or video
+- `POST /v1/media-assets/export` — download selected assets and metadata as ZIP
 - `GET /v1/workspaces/{workspace_id}/agent-runs` — inspect persisted AgentRun traces
 - `POST /v1/metrics/aggregate` — aggregate validated metric rows
 - `POST /v1/import/csv/validate?data_mode=SIMULATED` — validate a CSV upload and return aggregate metrics
