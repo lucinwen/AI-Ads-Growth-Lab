@@ -104,3 +104,23 @@ class ProductionRunRequest(StrictModel):
     duration_sec: int = Field(default=20, ge=6, le=60)
     placement: Literal["9:16", "1:1", "16:9"] = "9:16"
     language: str = "en-US"
+
+
+class ImageGenerationRequest(StrictModel):
+    creative_id: str
+    prompt: str = Field(min_length=20, max_length=4000)
+    size: Literal["1024x1024", "1024x1536", "1536x1024"] = "1024x1536"
+    quality: Literal["low", "medium", "high"] = "high"
+    variation_group: str | None = Field(default=None, max_length=120)
+
+
+class VideoGenerationRequest(StrictModel):
+    creative_id: str
+    prompt: str = Field(min_length=20, max_length=4000)
+    aspect_ratio: Literal["9:16", "16:9", "1:1"] = "9:16"
+    duration_sec: int = Field(default=5, ge=3, le=15)
+
+
+class AssetMetadataUpdate(StrictModel):
+    label: str | None = Field(default=None, max_length=160)
+    notes: str | None = Field(default=None, max_length=1000)
