@@ -58,7 +58,7 @@ No automatic ad publishing, budget changes or campaign operations are implemente
 ## Current verification
 - Backend test suite: 18 tests passed in GitHub Actions at the last recorded full run.
 - Frontend TypeScript/Vite production build: passed in GitHub Actions at the last recorded full run.
-- Test coverage includes metric calculations, zero denominators, SIMULATED/REAL isolation, CSV validation, workspace/product/claim/creative/experiment persistence, asset review, and Strategy Agent provider failure/success paths using a mocked provider.
+- Test coverage includes metric calculations, zero denominators, SIMULATED/REAL isolation, CSV validation, workspace/product/claim/creative/experiment persistence, asset review, Strategy and Production Agent provider paths using mocked providers, and asset/claim review evidence gates.
 
 ## Demo flow
 1. Open Overview and inspect the clearly labeled synthetic dataset.
