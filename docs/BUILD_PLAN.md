@@ -27,7 +27,8 @@
 - [x] AssetVersion / Experiment / Variant CRUD APIs
 - [x] Verified claim requires evidence reference
 - [x] Workspace ownership checks for products, creatives and experiment variants
-- [x] Audit log for create and variant operations
+- [x] Audit log for create, variant and review operations
+- [x] Separate asset review endpoint; new versions always start PENDING
 - [ ] PostgreSQL connection and migrations (SQLite is current local runtime)
 - [ ] Claim reviewer identity, timestamp and full review history
 - [ ] Asset rights manifest and immutable approval transitions
