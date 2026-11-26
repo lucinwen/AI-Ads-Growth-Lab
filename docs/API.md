@@ -24,7 +24,7 @@ The current local runtime uses SQLite for persistence. The PostgreSQL schema is 
 - `GET /v1/workspaces/{workspace_id}/agent-runs` — lists persisted Agent execution records.
 
 ### Guardrails
-- A VERIFIED claim requires at least one evidence reference.
+- New claims are created as UNVERIFIED; verification requires a separate reviewer record and at least one evidence reference.
 - Experiment `data_mode` must match its workspace.
 - Creative and product must belong to the same workspace.
 - Experiment variants can only reference creatives from the same workspace.
