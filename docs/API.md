@@ -1,37 +1,37 @@
-# Backend API — first vertical slice
+# API Reference — AI Ads Growth Lab
 
 Base URL: `http://localhost:8000`
 
-## GET /health
-Returns service health and version.
+## Health and demo
+- `GET /health` — service health.
+- `GET /v1/demo/overview` — bundled synthetic experiment aggregated by date, creative, and funnel stage. Includes seeded demo workspace/product IDs.
 
-## POST /v1/metrics/aggregate
-Accepts JSON with one or more rows. Every row must include:
-`data_mode, impressions, clicks, landing_page_views, add_to_cart, purchases, refunded_orders, spend_usd, attributed_revenue_usd`.
+## Persistent workspace APIs
 
-All rows must use the same mode: SIMULATED or REAL. Mixed modes return HTTP 422. Negative counts or costs are rejected. Zero denominators return JSON null.
+The current local runtime uses SQLite for persistence. The PostgreSQL schema is a deployment/migration target and is not yet wired into the application.
 
-Example:
-```json
-{
-  "rows": [{
-    "data_mode": "SIMULATED",
-    "impressions": 1000,
-    "clicks": 20,
-    "landing_page_views": 18,
-    "add_to_cart": 5,
-    "purchases": 2,
-    "refunded_orders": 0,
-    "spend_usd": 20,
-    "attributed_revenue_usd": 60
-  }]
-}
-```
+- `POST /v1/workspaces` / `GET /v1/workspaces`
+- `POST /v1/products` / `GET /v1/workspaces/{workspace_id}/products`
+- `POST /v1/claims` / `GET /v1/products/{product_id}/claims`
+- `POST /v1/creatives` / `GET /v1/workspaces/{workspace_id}/creatives`
+- `POST /v1/assets/versions` / `GET /v1/creatives/{creative_id}/assets`
+- `POST /v1/experiments` / `GET /v1/workspaces/{workspace_id}/experiments`
+- `POST /v1/experiments/{experiment_id}/variants` / `GET /v1/experiments/{experiment_id}/variants`
+- `GET /v1/workspaces/{workspace_id}/audit`
 
-## POST /v1/import/csv/validate?data_mode=SIMULATED
-Multipart form upload with field name `file`. Requires a CSV with the metric fields plus a `data_mode` column. Every row must match the requested mode. This endpoint validates and aggregates; it does not persist data yet.
+### Guardrails
+- A VERIFIED claim requires at least one evidence reference.
+- Experiment `data_mode` must match its workspace.
+- Creative and product must belong to the same workspace.
+- Experiment variants can only reference creatives from the same workspace.
+- Every create operation writes an audit record.
+- Asset versions increment per creative and are not overwritten.
 
-## Metric semantics
+## Metrics
+- `POST /v1/metrics/aggregate` — deterministic metric aggregation.
+- `POST /v1/import/csv/validate?data_mode=SIMULATED` — validate and aggregate uploaded CSV.
+
+Metric semantics:
 - CTR = clicks / impressions
 - CPC = spend / clicks
 - LPV rate = landing page views / clicks
@@ -41,4 +41,4 @@ Multipart form upload with field name `file`. Requires a CSV with the metric fie
 - AOV = attributed revenue / purchases
 - ROAS = attributed revenue / spend
 
-ROAS is not ROI. This API does not calculate ROI because incremental profit and full investment costs are not yet modeled.
+Zero denominator returns null. ROAS is not ROI.
