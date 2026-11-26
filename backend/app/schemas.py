@@ -97,3 +97,10 @@ class ClaimReviewCreate(StrictModel):
     decision: Literal["VERIFIED", "UNVERIFIED", "PROHIBITED", "NEEDS_REVIEW"]
     evidence_refs: list[str] = Field(default_factory=list)
     reason: str = Field(min_length=3, max_length=1000)
+
+
+class ProductionRunRequest(StrictModel):
+    creative_id: str
+    duration_sec: int = Field(default=20, ge=6, le=60)
+    placement: Literal["9:16", "1:1", "16:9"] = "9:16"
+    language: str = "en-US"
