@@ -81,6 +81,13 @@ def init_db() -> None:
           role TEXT NOT NULL DEFAULT 'TREATMENT',
           UNIQUE(experiment_id, creative_id)
         );
+        CREATE TABLE IF NOT EXISTS review_record (
+          id TEXT PRIMARY KEY, asset_version_id TEXT NOT NULL REFERENCES asset_version(id) ON DELETE CASCADE,
+          reviewer_id TEXT NOT NULL, decision TEXT NOT NULL
+            CHECK(decision IN ('APPROVED','REJECTED','NEEDS_CHANGES','BLOCKED')),
+          reason TEXT, findings_json TEXT NOT NULL DEFAULT '[]',
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
         CREATE TABLE IF NOT EXISTS audit_log (
           id INTEGER PRIMARY KEY AUTOINCREMENT, workspace_id TEXT NOT NULL REFERENCES workspace(id) ON DELETE CASCADE,
           actor_type TEXT NOT NULL, actor_id TEXT, action TEXT NOT NULL,
