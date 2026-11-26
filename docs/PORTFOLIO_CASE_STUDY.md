@@ -56,9 +56,9 @@ No automatic ad publishing, budget changes or campaign operations are implemente
 - GitHub Actions runs backend tests and frontend production build.
 
 ## Current verification
-- Backend test suite: 18 tests passed in GitHub Actions at the last recorded full run.
+- Backend test suite: 23 tests passed in GitHub Actions at the last recorded full run.
 - Frontend TypeScript/Vite production build: passed in GitHub Actions at the last recorded full run.
-- Test coverage includes metric calculations, zero denominators, SIMULATED/REAL isolation, CSV validation, workspace/product/claim/creative/experiment persistence, asset review, Strategy and Production Agent provider paths using mocked providers, and asset/claim review evidence gates.
+- Test coverage includes metric calculations, zero denominators, SIMULATED/REAL isolation, CSV validation, workspace/product/claim/creative/experiment persistence, asset review, Strategy and Production Agent provider paths using mocked providers, asset/claim review evidence gates, and statistical comparison/sample sufficiency tests.
 
 ## Demo flow
 1. Open Overview and inspect the clearly labeled synthetic dataset.
@@ -82,21 +82,21 @@ No automatic ad publishing, budget changes or campaign operations are implemente
 
 ## Evidence and limitations
 ### Implemented
-The UI, local CRUD APIs, SQLite persistence, deterministic metric calculations, CSV validation, one configurable Strategy Agent endpoint, AgentRun persistence, and CI tests are implemented.
+The UI, local CRUD APIs, SQLite persistence, deterministic metric calculations, CSV validation, configurable Strategy and Production Agent endpoints, AgentRun persistence, and CI tests are implemented.
 
 ### Simulated
 All 84 daily media records, impressions, clicks, purchases, spend, attributed revenue, and the displayed ROAS/CTR/CVR values are synthetic. They do not represent actual TikTok or Meta delivery.
 
 ### Not yet implemented
 - PostgreSQL runtime and migrations (SQLite is the current local adapter).
-- Full multi-agent orchestrator and specialist execution beyond Creative Strategy.
+- Full multi-agent orchestrator and specialist execution beyond Strategy and Production.
 - Image/video generation pipeline and asset storage.
 - Full claim-review evidence UI and regulatory workflow.
 - Read-only TikTok/Meta account connectors.
-- Real A/B tests, statistical power validation against actual traffic, incrementality measurement, and actual campaign results.
+- Real randomized A/B tests, robust power analysis against actual traffic, sequential-testing controls, multiple-comparison correction, incrementality measurement, and actual campaign results.
 
 ## Interview narrative (90 seconds)
-“I noticed that AIGC creative tools usually focus on producing more assets, but a commercial creative team also needs to know which claims are supported, which assets are ready for testing, how a test is configured, and what the data actually says. I built AI Ads Growth Lab around that workflow. It has a persistent product and claim registry, a Creative Studio for testable concepts, an experiment builder, deterministic funnel metrics, and an auditable Strategy Agent that produces structured drafts. I deliberately separated simulated and real data, made new claims unverified by default, and kept publishing and budget changes behind human control. The current demo proves the product workflow and engineering foundations; actual media lift remains unvalidated until an authorized live experiment is run.”
+“I noticed that AIGC creative tools usually focus on producing more assets, but a commercial creative team also needs to know which claims are supported, which assets are ready for testing, how a test is configured, and what the data actually says. I built AI Ads Growth Lab around that workflow. It has a persistent product and claim registry, a Creative Studio for testable concepts, an experiment builder, deterministic funnel metrics, auditable Strategy and Production Agents that produce structured creative and storyboard drafts, and an experiment comparison workflow with statistical guardrails. I deliberately separated simulated and real data, made new claims unverified by default, and kept publishing and budget changes behind human control. The current demo proves the product workflow and engineering foundations; actual media lift remains unvalidated until an authorized live experiment is run.”
 
 ## Links
 - Repository: https://github.com/lucinwen/AI-Ads-Growth-Lab
