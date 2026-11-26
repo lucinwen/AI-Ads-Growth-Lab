@@ -88,6 +88,12 @@ def init_db() -> None:
           reason TEXT, findings_json TEXT NOT NULL DEFAULT '[]',
           created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS agent_run (
+          id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL REFERENCES workspace(id) ON DELETE CASCADE,
+          agent_name TEXT NOT NULL, status TEXT NOT NULL, model_name TEXT,
+          input_refs_json TEXT NOT NULL DEFAULT '{}', output_refs_json TEXT NOT NULL DEFAULT '{}',
+          error TEXT, latency_ms INTEGER, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
         CREATE TABLE IF NOT EXISTS audit_log (
           id INTEGER PRIMARY KEY AUTOINCREMENT, workspace_id TEXT NOT NULL REFERENCES workspace(id) ON DELETE CASCADE,
           actor_type TEXT NOT NULL, actor_id TEXT, action TEXT NOT NULL,
