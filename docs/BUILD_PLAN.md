@@ -18,7 +18,7 @@
 - [x] Growth Insights view with descriptive signals and explicit limitations
 - [x] Agent Activity registry that distinguishes specifications from executed runs
 - [x] Docker Compose frontend + backend services
-- [x] GitHub Actions backend tests and frontend production build
+- [x] GitHub Actions backend tests, frontend production build and Docker Compose config validation
 - [ ] Browser-level visual QA and responsive screenshots
 
 ## P2 — Persistent product data
@@ -34,7 +34,7 @@
 - [ ] Claim review UI and reviewer identity/access control
 - [ ] Asset rights manifest and immutable approval transitions
 - [ ] Import batch persistence, deduplication and validation report history
-- [ ] Persisted AgentRun trace model
+- [x] Persisted AgentRun trace model
 
 ## P3 — Functional creative workspace
 - [x] Persisted creative hypotheses and Creative Studio draft creation
