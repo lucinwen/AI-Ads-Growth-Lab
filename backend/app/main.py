@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field, ConfigDict
 
 from .metrics import MetricRow, aggregate_metrics
 from . import storage
-from .schemas import (WorkspaceCreate, ProductCreate, ClaimCreate, CreativeCreate, AssetVersionCreate, AssetReviewCreate, ExperimentCreate, VariantCreate, StrategyRunRequest)
+from .schemas import (WorkspaceCreate, ProductCreate, ClaimCreate, ClaimReviewCreate, CreativeCreate, AssetVersionCreate, AssetReviewCreate, ExperimentCreate, VariantCreate, StrategyRunRequest)
 from .agents import generate_creative_strategy
 
 app = FastAPI(title="AI Ads Growth Lab API", version="0.4.0")
@@ -258,8 +258,8 @@ def create_claim(payload: ClaimCreate):
         product = db.execute("SELECT id FROM product WHERE id=?", (payload.product_id,)).fetchone()
         if not product:
             raise HTTPException(status_code=404, detail="Product not found")
-        if payload.status == "VERIFIED" and not payload.evidence_refs:
-            raise HTTPException(status_code=422, detail="VERIFIED claims require at least one evidence reference")
+        if payload.status != "UNVERIFIED":
+            raise HTTPException(status_code=422, detail="Claims must be created UNVERIFIED; use the claim review endpoint to change status.")
         db.execute(
             "INSERT INTO claim(id,product_id,claim_text,claim_type,status,evidence_refs_json,risk_level,notes) VALUES(?,?,?,?,?,?,?,?)",
             (claim_id, payload.product_id, payload.claim_text, payload.claim_type, payload.status,
@@ -537,5 +537,48 @@ def list_agent_runs(workspace_id: str):
             result = dict(row)
             result["input_refs"] = json.loads(result.pop("input_refs_json"))
             result["output_refs"] = json.loads(result.pop("output_refs_json"))
+            results.append(result)
+        return results
+
+
+@app.post("/v1/claims/{claim_id}/review", status_code=201)
+def review_claim(claim_id: str, payload: ClaimReviewCreate):
+    review_id = str(uuid.uuid4())
+    if payload.decision == "VERIFIED" and not payload.evidence_refs:
+        raise HTTPException(status_code=422, detail="VERIFIED claims require at least one evidence reference")
+    with storage.connect() as db:
+        claim = db.execute(
+            "SELECT cl.id, cl.product_id, p.workspace_id FROM claim cl JOIN product p ON p.id=cl.product_id WHERE cl.id=?",
+            (claim_id,),
+        ).fetchone()
+        if not claim:
+            raise HTTPException(status_code=404, detail="Claim not found")
+        db.execute(
+            "INSERT INTO claim_review(id,claim_id,reviewer_id,decision,evidence_refs_json,reason) VALUES(?,?,?,?,?,?)",
+            (review_id, claim_id, payload.reviewer_id, payload.decision,
+             json.dumps(payload.evidence_refs, ensure_ascii=False), payload.reason),
+        )
+        db.execute(
+            "UPDATE claim SET status=?,evidence_refs_json=? WHERE id=?",
+            (payload.decision, json.dumps(payload.evidence_refs, ensure_ascii=False), claim_id),
+        )
+        storage.audit(db, claim["workspace_id"], "REVIEW", "CLAIM", claim_id,
+                      {"reviewer_id": payload.reviewer_id, "decision": payload.decision})
+        row = db.execute("SELECT * FROM claim_review WHERE id=?", (review_id,)).fetchone()
+        result = dict(row)
+        result["evidence_refs"] = json.loads(result.pop("evidence_refs_json"))
+        return result
+
+
+@app.get("/v1/claims/{claim_id}/reviews")
+def list_claim_reviews(claim_id: str):
+    with storage.connect() as db:
+        if not db.execute("SELECT 1 FROM claim WHERE id=?", (claim_id,)).fetchone():
+            raise HTTPException(status_code=404, detail="Claim not found")
+        rows = db.execute("SELECT * FROM claim_review WHERE claim_id=? ORDER BY created_at DESC", (claim_id,))
+        results = []
+        for row in rows:
+            result = dict(row)
+            result["evidence_refs"] = json.loads(result.pop("evidence_refs_json"))
             results.append(result)
         return results
