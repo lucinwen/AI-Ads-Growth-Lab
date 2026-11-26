@@ -442,14 +442,14 @@ function AgentsPage({workspaceId}:{workspaceId:string}) {
   },[workspaceId]);
   const agents=[
     ["Strategy Agent","Creative angles, hooks and testable hypotheses","IMPLEMENTED · PROVIDER CONFIG","green"],
-    ["Creative Production Agent","Scripts, storyboards, prompts and asset manifests","SPEC DEFINED","blue"],
+    ["Creative Production Agent","Scripts, storyboards, prompts and asset manifests","IMPLEMENTED · PROVIDER CONFIG","green"],
     ["Compliance Agent","Claims, evidence, rights and policy precheck","HUMAN GATE","amber"],
     ["Asset QA Agent","Technical specs, brand consistency and review","SPEC DEFINED","blue"],
     ["Analytics Agent","Metric snapshots, funnel diagnostics and limitations","API FOUNDATION","green"],
     ["Growth Advisor","Prioritized next creative and media experiments","SPEC DEFINED","blue"]
   ];
   return <div className="page-stack">
-    <div className="agent-hero panel"><div className="agent-orb"><Bot size={24}/></div><div><Pill tone="amber">Orchestration not connected yet</Pill><h2>Specialist agents, one auditable workflow.</h2><p>Agent roles and Skills are specified in the repository. The current running slice includes deterministic analytics; LLM execution, tool routing and persistent run logs are future implementation work.</p></div></div>
+    <div className="agent-hero panel"><div className="agent-orb"><Bot size={24}/></div><div><Pill tone="amber">Orchestration not connected yet</Pill><h2>Specialist agents, one auditable workflow.</h2><p>Strategy and Production Agents can execute with a configured provider and persist drafts/run traces. A full multi-agent orchestrator, compliance agent and asset QA agent remain future work.</p></div></div>
     <SectionTitle title="Agent registry" desc="Capability specifications and implementation status — not simulated run history."/>
     <div className="agent-grid">{agents.map(([name,desc,status,tone])=><div className="panel agent-card" key={name}><div className="agent-card-icon"><Bot size={18}/></div><div><h3>{name}</h3><p>{desc}</p></div><Pill tone={tone as any}>{status}</Pill></div>)}</div>
     <div className="panel"><SectionTitle title="Recent execution records" desc="Persisted AgentRun records. Failed runs are visible and traceable; no fake activity is displayed."/>
