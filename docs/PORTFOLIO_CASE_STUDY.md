@@ -47,7 +47,8 @@ No automatic ad publishing, budget changes or campaign operations are implemente
 - Claim Registry can add unverified product claims.
 - Experiment Builder can save an experiment and attach the four creative hypotheses as variants.
 - Asset versions default to PENDING and have a separate human-review endpoint.
-- Configurable Creative Strategy Agent uses an OpenAI-compatible chat-completions endpoint, validates structured output and persists returned concepts as drafts.\n- Configurable Creative Production Agent generates versioned scripts, storyboards, camera directions and asset prompts from a saved creative concept.
+- Configurable Creative Strategy Agent uses an OpenAI-compatible chat-completions endpoint, validates structured output and persists returned concepts as drafts.
+- Configurable Creative Production Agent generates versioned scripts, storyboards, camera directions and asset prompts from a saved creative concept.
 - AgentRun records retain status, model, input/output references, latency and error information.
 - Dashboard aggregates the bundled synthetic dataset by date, creative and funnel stage.
 - CSV validation endpoint rejects data-mode mismatch.
@@ -55,7 +56,7 @@ No automatic ad publishing, budget changes or campaign operations are implemente
 - GitHub Actions runs backend tests and frontend production build.
 
 ## Current verification
-- Backend test suite: 17 tests passed in GitHub Actions at the last recorded full run.
+- Backend test suite: 18 tests passed in GitHub Actions at the last recorded full run.
 - Frontend TypeScript/Vite production build: passed in GitHub Actions at the last recorded full run.
 - Test coverage includes metric calculations, zero denominators, SIMULATED/REAL isolation, CSV validation, workspace/product/claim/creative/experiment persistence, asset review, and Strategy Agent provider failure/success paths using a mocked provider.
 
