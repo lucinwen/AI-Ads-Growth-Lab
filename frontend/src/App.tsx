@@ -58,9 +58,6 @@ function MetricCard({ label, value, hint, icon, accent }: { label: string; value
 function SectionTitle({ title, desc, action }: { title: string; desc?: string; action?: ReactNode }) {
   return <div className="section-title"><div><h2>{title}</h2>{desc && <p>{desc}</p>}</div>{action}</div>;
 }
-function EmptyPanel({ icon, title, desc }: { icon: ReactNode; title: string; desc: string }) {
-  return <div className="empty-panel"><div className="empty-icon">{icon}</div><h3>{title}</h3><p>{desc}</p></div>;
-}
 
 export default function App() {
   const [page, setPage] = useState("overview");
@@ -93,9 +90,6 @@ export default function App() {
   }, [refresh]);
 
   const s = overview?.summary;
-  const filteredCreatives = useMemo(() => (overview?.creatives || []).filter(c =>
-    [c.creative_id, conceptName[c.concept] || c.concept].join(" ").toLowerCase().includes(search.toLowerCase())
-  ), [overview, search]);
 
   const notify = (message: string) => {
     setToast(message);
@@ -155,7 +149,7 @@ export default function App() {
         </div>
 
         {apiError && <div className="api-alert"><div><strong>API connection unavailable</strong><span>Start the FastAPI service to load live demo metrics. The interface is running, but no numbers are being invented.</span></div><button onClick={()=>setRefresh(v=>v+1)}>Retry connection</button></div>}
-        {page === "overview" && <OverviewPage overview={overview} loading={loading} onImport={importCsv} importing={importing} importResult={importResult} onRefresh={()=>setRefresh(v=>v+1)} />}
+        {page === "overview" && <OverviewPage overview={overview} loading={loading} search={search} onImport={importCsv} importing={importing} importResult={importResult} onRefresh={()=>setRefresh(v=>v+1)} />}
         {page === "creative" && <CreativePage drafts={drafts} setDrafts={setDrafts} newHook={newHook} setNewHook={setNewHook} notify={notify}/>}
         {page === "experiments" && <ExperimentsPage overview={overview} loading={loading}/>}
         {page === "insights" && <InsightsPage overview={overview} loading={loading}/>}
@@ -167,11 +161,11 @@ export default function App() {
   </div>;
 }
 
-function OverviewPage({overview,loading,onImport,importing,importResult,onRefresh}:{
-  overview:Overview|null;loading:boolean;onImport:(f?:File)=>void;importing:boolean;importResult:string;onRefresh:()=>void;
+function OverviewPage({overview,loading,search,onImport,importing,importResult,onRefresh}:{
+  overview:Overview|null;loading:boolean;search:string;onImport:(f?:File)=>void;importing:boolean;importResult:string;onRefresh:()=>void;
 }) {
   const m=overview?.summary.metrics; const t=overview?.summary.totals;
-  const best=[...(overview?.creatives||[])].sort((a,b)=>(b.metrics.ctr||0)-(a.metrics.ctr||0))[0];
+  const visibleCreatives=(overview?.creatives||[]).filter(c=>[c.creative_id,conceptName[c.concept]||c.concept].join(" ").toLowerCase().includes(search.toLowerCase()));
   return <>
     <div className="data-banner"><div className="banner-left"><span className="banner-icon"><Activity size={17}/></span><div><strong>SIMULATED DATASET</strong><span>84 synthetic daily records · 12 creative variants · Dec 01–07, 2026</span></div></div><div className="banner-right"><span>Source: bundled demo CSV</span><button onClick={onRefresh}>Refresh <Activity size={13}/></button></div></div>
     <div className="metric-grid">
@@ -201,8 +195,8 @@ function OverviewPage({overview,loading,onImport,importing,importResult,onRefres
     </div>
     <div className="panel table-panel">
       <div className="panel-head"><div><h3>Creative performance</h3><p>Compare creative hypotheses across 12 variants</p></div><Pill tone="blue">12 variants</Pill></div>
-      {overview ? <div className="table-scroll"><table><thead><tr><th>CREATIVE</th><th>IMPRESSIONS</th><th>CTR</th><th>CVR</th><th>SPEND</th><th>CPA</th><th>ROAS</th><th>STATUS</th></tr></thead><tbody>{[...overview.creatives].sort((a,b)=>(b.metrics.roas||0)-(a.metrics.roas||0)).slice(0,8).map((c,i)=><tr key={c.creative_id}><td><div className="creative-cell"><div className={`creative-thumb thumb-${c.concept.toLowerCase()}`}>{c.concept.slice(-1)}</div><div><strong>{conceptName[c.concept]||c.concept}</strong><span>{c.creative_id}</span></div></div></td><td>{number(c.totals.impressions)}</td><td>{percent(c.metrics.ctr)}</td><td>{percent(c.metrics.cvr_click_to_purchase)}</td><td>{money(c.totals.spend_usd)}</td><td>{money(c.metrics.cpa_usd)}</td><td><strong>{c.metrics.roas?.toFixed(2)}x</strong></td><td><Pill tone={i===0?"green":"neutral"}>{i===0?"Top demo ROAS":"Synthetic"}</Pill></td></tr>)}</tbody></table></div> : <ChartSkeleton/>}
-      <div className="table-foot"><span>Showing 8 of {overview?.creative_count||12} creative variants</span><span>Ranked by synthetic ROAS · descriptive only</span></div>
+      {overview ? <div className="table-scroll"><table><thead><tr><th>CREATIVE</th><th>IMPRESSIONS</th><th>CTR</th><th>CVR</th><th>SPEND</th><th>CPA</th><th>ROAS</th><th>STATUS</th></tr></thead><tbody>{visibleCreatives.sort((a,b)=>(b.metrics.roas||0)-(a.metrics.roas||0)).slice(0,8).map((c,i)=><tr key={c.creative_id}><td><div className="creative-cell"><div className={`creative-thumb thumb-${c.concept.toLowerCase()}`}>{c.concept.slice(-1)}</div><div><strong>{conceptName[c.concept]||c.concept}</strong><span>{c.creative_id}</span></div></div></td><td>{number(c.totals.impressions)}</td><td>{percent(c.metrics.ctr)}</td><td>{percent(c.metrics.cvr_click_to_purchase)}</td><td>{money(c.totals.spend_usd)}</td><td>{money(c.metrics.cpa_usd)}</td><td><strong>{c.metrics.roas?.toFixed(2)}x</strong></td><td><Pill tone={i===0?"green":"neutral"}>{i===0?"Top demo ROAS":"Synthetic"}</Pill></td></tr>)}</tbody></table></div> : <ChartSkeleton/>}
+      <div className="table-foot"><span>Showing {Math.min(8,visibleCreatives.length)} of {visibleCreatives.length} matching variants</span><span>Ranked by synthetic ROAS · descriptive only</span></div>
     </div>
     <div className="bottom-grid">
       <div className="panel upload-panel"><div className="panel-head"><div><h3>Import experiment data</h3><p>Validate a CSV against the current schema</p></div><CloudUpload size={18}/></div><label className="upload-zone"><input type="file" accept=".csv" onChange={e=>onImport(e.target.files?.[0])}/><CloudUpload size={22}/><strong>{importing?"Validating…":"Drop a CSV or browse files"}</strong><span>SIMULATED mode only in this demo flow</span></label>{importResult&&<div className="import-result">{importResult}</div>}</div>
