@@ -204,3 +204,61 @@ def test_demo_workspace_is_seeded_with_persistent_creatives():
     response = client.get("/v1/workspaces/" + workspace_id + "/creatives")
     assert response.status_code == 200
     assert len(response.json()) == 4
+
+
+def test_strategy_agent_requires_configured_provider(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    response = client.post("/v1/agents/creative-strategy/run", json={
+        "workspace_id":"demo-us-beauty-workspace",
+        "product_id":"demo-luma-dew-moisturizer",
+        "audience_hypothesis":"Adults shopping for everyday moisturizer and skincare routines.",
+        "campaign_objective":"CONVERSION",
+        "concept_count":2,
+        "language":"en-US"
+    })
+    assert response.status_code == 503
+    assert "OPENAI_API_KEY" in response.json()["detail"]
+    runs = client.get("/v1/workspaces/demo-us-beauty-workspace/agent-runs").json()
+    assert runs[0]["agent_name"] == "creative_strategy"
+    assert runs[0]["status"] == "FAILED"
+
+
+def test_strategy_agent_persists_generated_draft_concepts(monkeypatch):
+    import app.main as main_module
+    from app.agents import CreativeConcept, StrategyOutput
+
+    async def fake_strategy(**kwargs):
+        return StrategyOutput(concepts=[
+            CreativeConcept(
+                concept_name="Routine framing", angle="Everyday ritual",
+                hook="A simple step in my morning routine.",
+                narrative="Show the product as one item in a daily routine.",
+                cta="Explore the product", hypothesis="Routine framing may improve relevance.",
+                format="Vertical video · 20s", claims_used=[]
+            ),
+            CreativeConcept(
+                concept_name="Texture detail", angle="Sensory demonstration",
+                hook="A closer look at the texture.",
+                narrative="Use close-up product shots without unsupported efficacy claims.",
+                cta="See product details", hypothesis="Texture detail may increase qualified curiosity.",
+                format="Product demo · 15s", claims_used=[]
+            )
+        ]), "test-model"
+
+    monkeypatch.setattr(main_module, "generate_creative_strategy", fake_strategy)
+    response = client.post("/v1/agents/creative-strategy/run", json={
+        "workspace_id":"demo-us-beauty-workspace",
+        "product_id":"demo-luma-dew-moisturizer",
+        "audience_hypothesis":"Adults shopping for everyday moisturizer and skincare routines.",
+        "campaign_objective":"CONVERSION",
+        "concept_count":2,
+        "language":"en-US"
+    })
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["status"] == "SUCCEEDED"
+    assert payload["model"] == "test-model"
+    assert len(payload["concepts"]) == 2
+    assert payload["concepts"][0]["status"] == "DRAFT_REQUIRES_REVIEW"
+    saved = client.get("/v1/workspaces/demo-us-beauty-workspace/creatives").json()
+    assert any(item["concept_name"] == "Routine framing" for item in saved)
