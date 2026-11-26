@@ -166,6 +166,22 @@ export default function App() {
   </div>;
 }
 
+function DataQualityPanel() {
+  const [report,setReport]=useState<any>(null);
+  const [error,setError]=useState("");
+  useEffect(()=>{
+    fetch(`${API}/v1/demo/data-quality`)
+      .then(r=>{if(!r.ok)throw new Error("Data quality report unavailable");return r.json();})
+      .then(setReport)
+      .catch(err=>setError(String(err.message||err)));
+  },[]);
+  const issues=report?.checks?Object.entries(report.checks).filter(([,value])=>Number(value)>0):[];
+  return <div className="panel quality-panel">
+    <div className="panel-head"><div><h3>Data quality & measurement integrity</h3><p>Row grain, event funnel consistency and data-mode audit.</p></div>{report&&<Pill tone={report.status==="PASS"?"green":"amber"}>{report.status}</Pill>}</div>
+    {error?<div className="import-result">{error}</div>:report?<><div className="quality-stats"><div><strong>{number(report.row_count)}</strong><span>Rows scanned</span></div><div><strong>{number(report.unique_grain_count)}</strong><span>Unique grain keys</span></div><div><strong>{report.issue_count}</strong><span>Detected issues</span></div><div><strong>{report.data_mode}</strong><span>Data provenance</span></div></div>{issues.length?<div className="quality-issues">{issues.map(([key,value])=><div key={key}><span>{key.replaceAll("_"," ")}</span><strong>{String(value)}</strong></div>)}</div>:<div className="quality-pass"><Check size={15}/> No deterministic row or funnel violations found in the bundled dataset.</div>}<p className="quality-foot">Passing validation checks structural consistency only; it does not authenticate source data. This dataset is synthetic.</p></>:<div className="empty-state-inline">Running data checks…</div>}
+  </div>;
+}
+
 function OverviewPage({overview,loading,search,onImport,importing,importResult,onRefresh}:{
   overview:Overview|null;loading:boolean;search:string;onImport:(f?:File)=>void;importing:boolean;importResult:string;onRefresh:()=>void;
 }) {
@@ -203,6 +219,7 @@ function OverviewPage({overview,loading,search,onImport,importing,importResult,o
       {overview ? <div className="table-scroll"><table><thead><tr><th>CREATIVE</th><th>IMPRESSIONS</th><th>CTR</th><th>CVR</th><th>SPEND</th><th>CPA</th><th>ROAS</th><th>STATUS</th></tr></thead><tbody>{visibleCreatives.sort((a,b)=>(b.metrics.roas||0)-(a.metrics.roas||0)).slice(0,8).map((c,i)=><tr key={c.creative_id}><td><div className="creative-cell"><div className={`creative-thumb thumb-${c.concept.toLowerCase()}`}>{c.concept.slice(-1)}</div><div><strong>{conceptName[c.concept]||c.concept}</strong><span>{c.creative_id}</span></div></div></td><td>{number(c.totals.impressions)}</td><td>{percent(c.metrics.ctr)}</td><td>{percent(c.metrics.cvr_click_to_purchase)}</td><td>{money(c.totals.spend_usd)}</td><td>{money(c.metrics.cpa_usd)}</td><td><strong>{c.metrics.roas?.toFixed(2)}x</strong></td><td><Pill tone={i===0?"green":"neutral"}>{i===0?"Top demo ROAS":"Synthetic"}</Pill></td></tr>)}</tbody></table></div> : <ChartSkeleton/>}
       <div className="table-foot"><span>Showing {Math.min(8,visibleCreatives.length)} of {visibleCreatives.length} matching variants</span><span>Ranked by synthetic ROAS · descriptive only</span></div>
     </div>
+    <DataQualityPanel/>
     <div className="bottom-grid">
       <div className="panel upload-panel"><div className="panel-head"><div><h3>Import experiment data</h3><p>Validate a CSV against the current schema</p></div><CloudUpload size={18}/></div><label className="upload-zone"><input type="file" accept=".csv" onChange={e=>onImport(e.target.files?.[0])}/><CloudUpload size={22}/><strong>{importing?"Validating…":"Drop a CSV or browse files"}</strong><span>SIMULATED mode only in this demo flow</span></label>{importResult&&<div className="import-result">{importResult}</div>}</div>
       <div className="panel callout-panel"><div className="callout-icon"><Sparkles size={18}/></div><div><h3>What this data can tell you</h3><p>Use this demo to test metric calculation, funnel diagnosis and creative comparison. It cannot prove real market lift or causal impact.</p><span>Next milestone · Persistent experiment workspace</span></div></div>
