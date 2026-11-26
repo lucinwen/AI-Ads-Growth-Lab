@@ -22,7 +22,7 @@
 - [x] Docker Compose frontend + backend services
 - [x] GitHub Actions backend tests, frontend production build and Docker Compose config validation
 - [ ] Browser-level visual QA and responsive screenshots
-- [ ] Real provider smoke test using user-owned API credentials
+- [x] Mocked image-generation success and video-job lifecycle tests\n- [ ] Real provider smoke test using user-owned API credentials
 
 ## P2 — Persistent product data
 - [x] SQLite local persistence layer and idempotent demo seed
