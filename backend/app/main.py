@@ -16,8 +16,8 @@ from pydantic import BaseModel, Field, ConfigDict
 
 from .metrics import MetricRow, aggregate_metrics
 from . import storage
-from .schemas import (WorkspaceCreate, ProductCreate, ClaimCreate, ClaimReviewCreate, CreativeCreate, AssetVersionCreate, AssetReviewCreate, ExperimentCreate, VariantCreate, StrategyRunRequest)
-from .agents import generate_creative_strategy
+from .schemas import (WorkspaceCreate, ProductCreate, ClaimCreate, ClaimReviewCreate, CreativeCreate, AssetVersionCreate, AssetReviewCreate, ExperimentCreate, VariantCreate, StrategyRunRequest, ProductionRunRequest)
+from .agents import generate_creative_strategy, generate_production_brief
 
 app = FastAPI(title="AI Ads Growth Lab API", version="0.4.0")
 storage.init_db()
@@ -580,5 +580,109 @@ def list_claim_reviews(claim_id: str):
         for row in rows:
             result = dict(row)
             result["evidence_refs"] = json.loads(result.pop("evidence_refs_json"))
+            results.append(result)
+        return results
+
+
+@app.post("/v1/agents/creative-production/run", status_code=201)
+async def run_creative_production_agent(payload: ProductionRunRequest):
+    run_id = str(uuid.uuid4())
+    with storage.connect() as db:
+        creative = db.execute("SELECT * FROM creative WHERE id=?", (payload.creative_id,)).fetchone()
+        if not creative:
+            raise HTTPException(status_code=404, detail="Creative not found")
+        product = db.execute("SELECT * FROM product WHERE id=?", (creative["product_id"],)).fetchone()
+        verified_rows = db.execute(
+            "SELECT id,claim_text,claim_type,evidence_refs_json FROM claim WHERE product_id=? AND status='VERIFIED'",
+            (creative["product_id"],),
+        ).fetchall()
+        verified_claims = [{
+            "id": row["id"], "claim_text": row["claim_text"], "claim_type": row["claim_type"],
+            "evidence_refs": json.loads(row["evidence_refs_json"])
+        } for row in verified_rows]
+        creative_data = {
+            "id": creative["id"], "concept_name": creative["concept_name"],
+            "angle": creative["angle"], "hook": creative["hook"],
+            "narrative": creative["narrative"], "cta": creative["cta"],
+            "hypothesis": creative["hypothesis"], "format": creative["format"],
+        }
+        product_data = {
+            "id": product["id"], "name": product["name"], "category": product["category"],
+            "currency": product["currency"], "price_cents": product["price_cents"],
+            "facts": json.loads(product["facts_json"]),
+        }
+        input_refs = {
+            "creative_id": payload.creative_id, "product_id": product["id"],
+            "duration_sec": payload.duration_sec, "placement": payload.placement,
+            "language": payload.language, "verified_claim_ids": [item["id"] for item in verified_claims],
+        }
+        db.execute(
+            "INSERT INTO agent_run(id,workspace_id,agent_name,status,input_refs_json) VALUES(?,?,?,?,?)",
+            (run_id, creative["workspace_id"], "creative_production", "RUNNING", json.dumps(input_refs, ensure_ascii=False)),
+        )
+        storage.audit(db, creative["workspace_id"], "RUN", "AGENT", run_id, {"agent_name":"creative_production"})
+
+    started = perf_counter()
+    try:
+        output, model_name = await generate_production_brief(
+            creative=creative_data, product=product_data, verified_claims=verified_claims,
+            duration_sec=payload.duration_sec, placement=payload.placement, language=payload.language,
+        )
+    except RuntimeError as exc:
+        latency_ms = int((perf_counter() - started) * 1000)
+        with storage.connect() as db:
+            db.execute("UPDATE agent_run SET status='FAILED',error=?,latency_ms=? WHERE id=?",
+                       (str(exc), latency_ms, run_id))
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        latency_ms = int((perf_counter() - started) * 1000)
+        with storage.connect() as db:
+            db.execute("UPDATE agent_run SET status='FAILED',error=?,latency_ms=? WHERE id=?",
+                       (str(exc), latency_ms, run_id))
+        raise HTTPException(status_code=502, detail=f"Creative production provider failed: {exc}") from exc
+
+    with storage.connect() as db:
+        current = db.execute(
+            "SELECT COALESCE(MAX(version_no),0) AS version_no FROM production_draft WHERE creative_id=?",
+            (payload.creative_id,),
+        ).fetchone()["version_no"]
+        version_no = current + 1
+        production_id = str(uuid.uuid4())
+        production_json = output.model_dump()
+        db.execute(
+            "INSERT INTO production_draft(id,creative_id,version_no,model_name,production_json,status) VALUES(?,?,?,?,?,?)",
+            (production_id, payload.creative_id, version_no, model_name,
+             json.dumps(production_json, ensure_ascii=False), "DRAFT_REQUIRES_REVIEW"),
+        )
+        latency_ms = int((perf_counter() - started) * 1000)
+        output_refs = {"production_draft_id": production_id, "creative_id": payload.creative_id, "version_no": version_no}
+        db.execute(
+            "UPDATE agent_run SET status='SUCCEEDED',model_name=?,output_refs_json=?,latency_ms=? WHERE id=?",
+            (model_name, json.dumps(output_refs), latency_ms, run_id),
+        )
+        storage.audit(db, creative["workspace_id"], "COMPLETE", "AGENT", run_id, output_refs)
+
+    return {
+        "run_id": run_id, "production_draft_id": production_id, "version_no": version_no,
+        "agent_name": "creative_production", "status": "SUCCEEDED", "model": model_name,
+        "latency_ms": latency_ms, "production": production_json,
+        "limitations": [
+            "This output is a script/storyboard/prompt brief, not a rendered image or video.",
+            "All objective product claims must be supported and human-reviewed.",
+            "No ad is published and no budget is spent."
+        ]
+    }
+
+
+@app.get("/v1/creatives/{creative_id}/production-drafts")
+def list_production_drafts(creative_id: str):
+    with storage.connect() as db:
+        if not db.execute("SELECT 1 FROM creative WHERE id=?", (creative_id,)).fetchone():
+            raise HTTPException(status_code=404, detail="Creative not found")
+        rows = db.execute("SELECT * FROM production_draft WHERE creative_id=? ORDER BY version_no DESC", (creative_id,))
+        results = []
+        for row in rows:
+            result = dict(row)
+            result["production"] = json.loads(result.pop("production_json"))
             results.append(result)
         return results
