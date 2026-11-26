@@ -52,6 +52,13 @@ def init_db() -> None:
           evidence_refs_json TEXT NOT NULL DEFAULT '[]', risk_level TEXT NOT NULL DEFAULT 'MEDIUM',
           notes TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS claim_review (
+          id TEXT PRIMARY KEY, claim_id TEXT NOT NULL REFERENCES claim(id) ON DELETE CASCADE,
+          reviewer_id TEXT NOT NULL, decision TEXT NOT NULL
+            CHECK(decision IN ('VERIFIED','UNVERIFIED','PROHIBITED','NEEDS_REVIEW')),
+          evidence_refs_json TEXT NOT NULL DEFAULT '[]', reason TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
         CREATE TABLE IF NOT EXISTS creative (
           id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL REFERENCES workspace(id) ON DELETE CASCADE,
           product_id TEXT NOT NULL REFERENCES product(id) ON DELETE CASCADE,
