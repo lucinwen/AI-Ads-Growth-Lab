@@ -3,6 +3,9 @@ from __future__ import annotations
 import csv
 import io
 import os
+import json
+import sqlite3
+import uuid
 from typing import Literal
 from pathlib import Path
 
@@ -11,8 +14,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, ConfigDict
 
 from .metrics import MetricRow, aggregate_metrics
+from . import storage
+from .schemas import (WorkspaceCreate, ProductCreate, ClaimCreate, CreativeCreate, AssetVersionCreate, ExperimentCreate, VariantCreate)
 
-app = FastAPI(title="AI Ads Growth Lab API", version="0.2.0")
+app = FastAPI(title="AI Ads Growth Lab API", version="0.3.0")
+
+@app.on_event("startup")
+def initialize_storage():
+    storage.init_db()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -192,3 +201,189 @@ def demo_overview():
         }
     except (KeyError, ValueError, TypeError) as exc:
         raise HTTPException(status_code=500, detail=f"Demo dataset validation failed: {exc}") from exc
+
+
+# Persistent workspace API. The local V1 runtime uses SQLite; the PostgreSQL schema
+# remains the deployment target for a later migration.
+@app.post("/v1/workspaces", status_code=201)
+def create_workspace(payload: WorkspaceCreate):
+    workspace_id = str(uuid.uuid4())
+    with storage.connect() as db:
+        db.execute(
+            "INSERT INTO workspace(id,name,market,vertical,data_mode) VALUES(?,?,?,?,?)",
+            (workspace_id, payload.name, payload.market.upper(), payload.vertical, payload.data_mode),
+        )
+        storage.audit(db, workspace_id, "CREATE", "WORKSPACE", workspace_id, payload.model_dump())
+        row = db.execute("SELECT * FROM workspace WHERE id=?", (workspace_id,)).fetchone()
+        return storage.row_dict(row)
+
+
+@app.get("/v1/workspaces")
+def list_workspaces():
+    with storage.connect() as db:
+        return [storage.row_dict(row) for row in db.execute("SELECT * FROM workspace ORDER BY created_at DESC")]
+
+
+@app.post("/v1/products", status_code=201)
+def create_product(payload: ProductCreate):
+    product_id = str(uuid.uuid4())
+    with storage.connect() as db:
+        workspace = db.execute("SELECT id FROM workspace WHERE id=?", (payload.workspace_id,)).fetchone()
+        if not workspace:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+        db.execute(
+            "INSERT INTO product(id,workspace_id,name,category,currency,price_cents,facts_json,landing_page_url) VALUES(?,?,?,?,?,?,?,?)",
+            (product_id, payload.workspace_id, payload.name, payload.category, payload.currency.upper(),
+             payload.price_cents, json.dumps(payload.facts, ensure_ascii=False), payload.landing_page_url),
+        )
+        storage.audit(db, payload.workspace_id, "CREATE", "PRODUCT", product_id, {"name": payload.name})
+        return storage.row_dict(db.execute("SELECT * FROM product WHERE id=?", (product_id,)).fetchone())
+
+
+@app.get("/v1/workspaces/{workspace_id}/products")
+def list_products(workspace_id: str):
+    with storage.connect() as db:
+        if not db.execute("SELECT 1 FROM workspace WHERE id=?", (workspace_id,)).fetchone():
+            raise HTTPException(status_code=404, detail="Workspace not found")
+        return [storage.row_dict(row) for row in db.execute("SELECT * FROM product WHERE workspace_id=? ORDER BY created_at DESC", (workspace_id,))]
+
+
+@app.post("/v1/claims", status_code=201)
+def create_claim(payload: ClaimCreate):
+    claim_id = str(uuid.uuid4())
+    with storage.connect() as db:
+        product = db.execute("SELECT id FROM product WHERE id=?", (payload.product_id,)).fetchone()
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        if payload.status == "VERIFIED" and not payload.evidence_refs:
+            raise HTTPException(status_code=422, detail="VERIFIED claims require at least one evidence reference")
+        db.execute(
+            "INSERT INTO claim(id,product_id,claim_text,claim_type,status,evidence_refs_json,risk_level,notes) VALUES(?,?,?,?,?,?,?,?)",
+            (claim_id, payload.product_id, payload.claim_text, payload.claim_type, payload.status,
+             json.dumps(payload.evidence_refs, ensure_ascii=False), payload.risk_level, payload.notes),
+        )
+        workspace_id = db.execute("SELECT workspace_id FROM product WHERE id=?", (payload.product_id,)).fetchone()["workspace_id"]
+        storage.audit(db, workspace_id, "CREATE", "CLAIM", claim_id, {"status": payload.status})
+        return storage.row_dict(db.execute("SELECT * FROM claim WHERE id=?", (claim_id,)).fetchone())
+
+
+@app.get("/v1/products/{product_id}/claims")
+def list_claims(product_id: str):
+    with storage.connect() as db:
+        if not db.execute("SELECT 1 FROM product WHERE id=?", (product_id,)).fetchone():
+            raise HTTPException(status_code=404, detail="Product not found")
+        return [storage.row_dict(row) for row in db.execute("SELECT * FROM claim WHERE product_id=? ORDER BY created_at DESC", (product_id,))]
+
+
+@app.post("/v1/creatives", status_code=201)
+def create_creative(payload: CreativeCreate):
+    creative_id = str(uuid.uuid4())
+    with storage.connect() as db:
+        product = db.execute("SELECT workspace_id FROM product WHERE id=?", (payload.product_id,)).fetchone()
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        if product["workspace_id"] != payload.workspace_id:
+            raise HTTPException(status_code=422, detail="Product does not belong to the supplied workspace")
+        db.execute(
+            "INSERT INTO creative(id,workspace_id,product_id,concept_name,angle,hook,narrative,cta,language,format,hypothesis) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            (creative_id, payload.workspace_id, payload.product_id, payload.concept_name, payload.angle,
+             payload.hook, payload.narrative, payload.cta, payload.language, payload.format, payload.hypothesis),
+        )
+        storage.audit(db, payload.workspace_id, "CREATE", "CREATIVE", creative_id, {"concept_name": payload.concept_name})
+        return dict(db.execute("SELECT * FROM creative WHERE id=?", (creative_id,)).fetchone())
+
+
+@app.get("/v1/workspaces/{workspace_id}/creatives")
+def list_creatives(workspace_id: str):
+    with storage.connect() as db:
+        if not db.execute("SELECT 1 FROM workspace WHERE id=?", (workspace_id,)).fetchone():
+            raise HTTPException(status_code=404, detail="Workspace not found")
+        return [dict(row) for row in db.execute("SELECT * FROM creative WHERE workspace_id=? ORDER BY created_at DESC", (workspace_id,))]
+
+
+@app.post("/v1/assets/versions", status_code=201)
+def create_asset_version(payload: AssetVersionCreate):
+    asset_id = str(uuid.uuid4())
+    with storage.connect() as db:
+        creative = db.execute("SELECT workspace_id FROM creative WHERE id=?", (payload.creative_id,)).fetchone()
+        if not creative:
+            raise HTTPException(status_code=404, detail="Creative not found")
+        current = db.execute("SELECT COALESCE(MAX(version_no),0) AS version_no FROM asset_version WHERE creative_id=?", (payload.creative_id,)).fetchone()["version_no"]
+        version_no = current + 1
+        db.execute(
+            "INSERT INTO asset_version(id,creative_id,version_no,asset_type,asset_uri,prompt_text,model_name,file_hash,approval_status) VALUES(?,?,?,?,?,?,?,?,?)",
+            (asset_id, payload.creative_id, version_no, payload.asset_type, payload.asset_uri, payload.prompt_text,
+             payload.model_name, payload.file_hash, payload.approval_status),
+        )
+        storage.audit(db, creative["workspace_id"], "CREATE_VERSION", "ASSET_VERSION", asset_id, {"version_no": version_no})
+        return dict(db.execute("SELECT * FROM asset_version WHERE id=?", (asset_id,)).fetchone())
+
+
+@app.get("/v1/creatives/{creative_id}/assets")
+def list_asset_versions(creative_id: str):
+    with storage.connect() as db:
+        if not db.execute("SELECT 1 FROM creative WHERE id=?", (creative_id,)).fetchone():
+            raise HTTPException(status_code=404, detail="Creative not found")
+        return [dict(row) for row in db.execute("SELECT * FROM asset_version WHERE creative_id=? ORDER BY version_no DESC", (creative_id,))]
+
+
+@app.post("/v1/experiments", status_code=201)
+def create_experiment(payload: ExperimentCreate):
+    experiment_id = str(uuid.uuid4())
+    with storage.connect() as db:
+        workspace = db.execute("SELECT data_mode FROM workspace WHERE id=?", (payload.workspace_id,)).fetchone()
+        if not workspace:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+        if workspace["data_mode"] != payload.data_mode:
+            raise HTTPException(status_code=422, detail="Experiment data_mode must match its workspace data_mode")
+        db.execute(
+            "INSERT INTO experiment(id,workspace_id,name,hypothesis,channel,data_mode,attribution_window,timezone,budget_cap_cents,currency) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            (experiment_id, payload.workspace_id, payload.name, payload.hypothesis, payload.channel,
+             payload.data_mode, payload.attribution_window, payload.timezone, payload.budget_cap_cents, payload.currency.upper()),
+        )
+        storage.audit(db, payload.workspace_id, "CREATE", "EXPERIMENT", experiment_id, {"data_mode": payload.data_mode})
+        return dict(db.execute("SELECT * FROM experiment WHERE id=?", (experiment_id,)).fetchone())
+
+
+@app.get("/v1/workspaces/{workspace_id}/experiments")
+def list_experiments(workspace_id: str):
+    with storage.connect() as db:
+        if not db.execute("SELECT 1 FROM workspace WHERE id=?", (workspace_id,)).fetchone():
+            raise HTTPException(status_code=404, detail="Workspace not found")
+        return [dict(row) for row in db.execute("SELECT * FROM experiment WHERE workspace_id=? ORDER BY created_at DESC", (workspace_id,))]
+
+
+@app.post("/v1/experiments/{experiment_id}/variants", status_code=201)
+def add_experiment_variant(experiment_id: str, payload: VariantCreate):
+    variant_id = str(uuid.uuid4())
+    with storage.connect() as db:
+        experiment = db.execute("SELECT workspace_id FROM experiment WHERE id=?", (experiment_id,)).fetchone()
+        creative = db.execute("SELECT workspace_id FROM creative WHERE id=?", (payload.creative_id,)).fetchone()
+        if not experiment:
+            raise HTTPException(status_code=404, detail="Experiment not found")
+        if not creative:
+            raise HTTPException(status_code=404, detail="Creative not found")
+        if experiment["workspace_id"] != creative["workspace_id"]:
+            raise HTTPException(status_code=422, detail="Creative and experiment must belong to the same workspace")
+        db.execute(
+            "INSERT INTO experiment_variant(id,experiment_id,creative_id,allocation_pct,role) VALUES(?,?,?,?,?)",
+            (variant_id, experiment_id, payload.creative_id, payload.allocation_pct, payload.role),
+        )
+        storage.audit(db, experiment["workspace_id"], "ADD_VARIANT", "EXPERIMENT_VARIANT", variant_id, payload.model_dump())
+        return dict(db.execute("SELECT * FROM experiment_variant WHERE id=?", (variant_id,)).fetchone())
+
+
+@app.get("/v1/experiments/{experiment_id}/variants")
+def list_experiment_variants(experiment_id: str):
+    with storage.connect() as db:
+        if not db.execute("SELECT 1 FROM experiment WHERE id=?", (experiment_id,)).fetchone():
+            raise HTTPException(status_code=404, detail="Experiment not found")
+        return [dict(row) for row in db.execute("SELECT * FROM experiment_variant WHERE experiment_id=? ORDER BY rowid", (experiment_id,))]
+
+
+@app.get("/v1/workspaces/{workspace_id}/audit")
+def list_audit_log(workspace_id: str):
+    with storage.connect() as db:
+        if not db.execute("SELECT 1 FROM workspace WHERE id=?", (workspace_id,)).fetchone():
+            raise HTTPException(status_code=404, detail="Workspace not found")
+        return [storage.row_dict(row) for row in db.execute("SELECT * FROM audit_log WHERE workspace_id=? ORDER BY id DESC LIMIT 200", (workspace_id,))]
