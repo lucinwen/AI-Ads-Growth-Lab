@@ -4,7 +4,9 @@ Base URL: `http://localhost:8000`
 
 ## Health and demo
 - `GET /health` — service health.
-- `GET /v1/demo/overview` — bundled synthetic experiment aggregated by date, creative, and funnel stage. Includes seeded demo workspace/product IDs.\n- `GET /v1/demo/experiment/compare?control_family=C-A&treatment_family=C-B&metric=CTR&mde_absolute=0.005` — synthetic creative-family comparison with two-proportion z-test, Wilson intervals, sample sufficiency and approximate sample planning.\n- `GET /v1/demo/data-quality` — row-grain, missing-field, numeric, data-mode and funnel-monotonicity audit for the bundled dataset.
+- `GET /v1/demo/overview` — bundled synthetic experiment aggregated by date, creative, and funnel stage. Includes seeded demo workspace/product IDs.
+- `GET /v1/demo/experiment/compare?control_family=C-A&treatment_family=C-B&metric=CTR&mde_absolute=0.005` — synthetic creative-family comparison with two-proportion z-test, Wilson intervals, sample sufficiency and approximate sample planning.
+- `GET /v1/demo/data-quality` — row-grain, missing-field, numeric, data-mode and funnel-monotonicity audit for the bundled dataset.
 
 ## Persistent workspace APIs
 
@@ -48,7 +50,13 @@ Metric semantics:
 - AOV = attributed revenue / purchases
 - ROAS = attributed revenue / spend
 
-Zero denominator returns null. ROAS is not ROI.\n\n## Experiment statistics\n\nThe comparison endpoint supports CTR (clicks / impressions) and click-to-purchase CVR (purchases / clicks). It returns arm-level Wilson 95% intervals, an absolute difference interval, relative lift, z-score, two-sided p-value, a minimum-sample decision label, and an approximate equal-allocation sample estimate for 80% power at 5% alpha when an MDE is supplied.\n\nThe implementation is a two-proportion z-test over aggregate counts. It assumes independent binary outcomes and is only a statistical workflow demonstration on the bundled synthetic dataset. It does not correct for multiple comparisons, repeated peeking, cluster effects, or platform delivery bias. Do not use it to declare real campaign winners without randomized assignment and a pre-registered analysis plan.
+Zero denominator returns null. ROAS is not ROI.
+
+## Experiment statistics
+
+The comparison endpoint supports CTR (clicks / impressions) and click-to-purchase CVR (purchases / clicks). It returns arm-level Wilson 95% intervals, an absolute difference interval, relative lift, z-score, two-sided p-value, a minimum-sample decision label, and an approximate equal-allocation sample estimate for 80% power at 5% alpha when an MDE is supplied.
+
+The implementation is a two-proportion z-test over aggregate counts. It assumes independent binary outcomes and is only a statistical workflow demonstration on the bundled synthetic dataset. It does not correct for multiple comparisons, repeated peeking, cluster effects, or platform delivery bias. Do not use it to declare real campaign winners without randomized assignment and a pre-registered analysis plan.
 
 ## Creative Strategy Agent configuration
 
@@ -57,3 +65,28 @@ Copy the root `.env.example` to `.env` and set `OPENAI_API_KEY`. Optional settin
 - `OPENAI_MODEL` (default: `gpt-4.1-mini`)
 
 The provider key is read from the process environment and is never written to SQLite. Strategy and Production Agents receive only product facts and VERIFIED claims. If no verified claims exist, the prompt explicitly forbids inventing product efficacy, clinical outcomes, testimonials or endorsements. Generated concepts are saved as drafts and require human review. The endpoint does not generate final image/video assets, publish ads or spend budget.
+
+
+## Creative Production Studio media APIs
+
+- `POST /v1/media-assets/generate-image` — calls the configured OpenAI Images API, downloads the returned image and stores it locally.
+- `POST /v1/media-assets/generate-video` — starts a Replicate model prediction and creates a GENERATING media record.
+- `POST /v1/media-assets/{asset_id}/refresh` — checks the Replicate prediction; on success downloads the video to local media storage.
+- `POST /v1/media-assets/upload` — multipart upload of PNG, JPEG, WebP, MP4 or WebM (100 MB limit, basic file-signature validation).
+- `GET /v1/creatives/{creative_id}/media-assets` — lists media assets for a creative.
+- `GET /v1/media-assets/{asset_id}` — retrieves one asset record.
+- `PATCH /v1/media-assets/{asset_id}` — updates label/notes.
+- `POST /v1/media-assets/{asset_id}/review` and `GET /v1/media-assets/{asset_id}/reviews` — records human review.
+- `POST /v1/media-assets/export` — accepts a JSON array of asset IDs and returns ZIP containing files and `manifest.json`.
+- `GET /media/{filename}` — serves locally stored media files.
+
+Image provider configuration:
+- `OPENAI_API_KEY`
+- `OPENAI_BASE_URL` (defaults to OpenAI API base URL)
+- `OPENAI_IMAGE_MODEL` (defaults to `gpt-image-1`)
+
+Video provider configuration:
+- `REPLICATE_API_TOKEN`
+- `REPLICATE_MODEL=owner/model`. The selected model must accept `prompt`, `aspect_ratio` and `duration` input keys; Replicate models have different input schemas, so verify the selected model before use.
+
+Generated files are stored in `AI_ADS_MEDIA_PATH` and served through `AI_ADS_PUBLIC_BASE_URL`. Docker Compose mounts `./media` to persist them. Do not commit generated media or API keys.
