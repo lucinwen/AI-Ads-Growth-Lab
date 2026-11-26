@@ -4,6 +4,7 @@ import csv
 import io
 import os
 import json
+from math import isfinite
 import sqlite3
 import uuid
 from time import perf_counter
@@ -744,4 +745,87 @@ def compare_demo_creative_families(
             "decision_note": "This is a statistical workflow demonstration on synthetic aggregate records, not a valid real-world randomized experiment or evidence of causal lift.",
         }
     except (KeyError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/v1/demo/data-quality")
+def demo_data_quality():
+    """Run deterministic row-level and event-funnel checks over the bundled demo CSV."""
+    dataset = Path(os.getenv("AI_ADS_DEMO_DATA_PATH", str(Path(__file__).resolve().parents[2] / "data" / "synthetic_daily_metrics.csv")))
+    if not dataset.exists():
+        raise HTTPException(status_code=503, detail="Demo dataset is not available")
+    required = [
+        "date", "experiment_id", "creative_id", "data_mode", "impressions",
+        "video_2s_views", "video_6s_views", "clicks", "landing_page_views",
+        "add_to_cart", "checkout_starts", "purchases", "orders_refunded",
+        "spend_usd", "attributed_revenue_usd",
+    ]
+    checks = {
+        "duplicate_grain": 0, "clicks_exceed_impressions": 0,
+        "landing_views_exceed_clicks": 0, "add_to_cart_exceed_landing_views": 0,
+        "checkout_exceed_add_to_cart": 0, "purchases_exceed_checkouts": 0,
+        "refunds_exceed_purchases": 0, "two_second_views_exceed_impressions": 0,
+        "six_second_views_exceed_two_second_views": 0, "invalid_numeric_rows": 0,
+        "non_simulated_rows": 0, "missing_required_fields": 0,
+    }
+    seen = set()
+    row_count = 0
+    modes: dict[str, int] = {}
+    try:
+        with dataset.open("r", encoding="utf-8-sig", newline="") as handle:
+            reader = csv.DictReader(handle)
+            headers = set(reader.fieldnames or [])
+            missing_headers = sorted(set(required) - headers)
+            if missing_headers:
+                raise ValueError(f"Missing required columns: {missing_headers}")
+            for row in reader:
+                row_count += 1
+                if any(row.get(field) in (None, "") for field in required):
+                    checks["missing_required_fields"] += 1
+                    continue
+                mode = row["data_mode"].upper()
+                modes[mode] = modes.get(mode, 0) + 1
+                if mode != "SIMULATED":
+                    checks["non_simulated_rows"] += 1
+                key = (row["date"], row["experiment_id"], row["creative_id"])
+                if key in seen:
+                    checks["duplicate_grain"] += 1
+                seen.add(key)
+                try:
+                    v = {field: float(row[field]) for field in required[4:]}
+                    if any(value < 0 for value in v.values()) or not all(isfinite(value) for value in v.values()):
+                        raise ValueError("Negative or non-finite metric")
+                    comparisons = [
+                        ("clicks", "impressions", "clicks_exceed_impressions"),
+                        ("landing_page_views", "clicks", "landing_views_exceed_clicks"),
+                        ("add_to_cart", "landing_page_views", "add_to_cart_exceed_landing_views"),
+                        ("checkout_starts", "add_to_cart", "checkout_exceed_add_to_cart"),
+                        ("purchases", "checkout_starts", "purchases_exceed_checkouts"),
+                        ("orders_refunded", "purchases", "refunds_exceed_purchases"),
+                        ("video_2s_views", "impressions", "two_second_views_exceed_impressions"),
+                        ("video_6s_views", "video_2s_views", "six_second_views_exceed_two_second_views"),
+                    ]
+                    for left, right, check_name in comparisons:
+                        if v[left] > v[right]:
+                            checks[check_name] += 1
+                except (ValueError, TypeError):
+                    checks["invalid_numeric_rows"] += 1
+        total_issues = sum(checks.values())
+        return {
+            "data_mode": "SIMULATED",
+            "source": "bundled_synthetic_dataset",
+            "row_count": row_count,
+            "unique_grain_count": len(seen),
+            "data_mode_counts": modes,
+            "checks": checks,
+            "issue_count": total_issues,
+            "status": "PASS" if total_issues == 0 else "REVIEW_REQUIRED",
+            "grain": "date × experiment_id × creative_id",
+            "limitations": [
+                "Passing deterministic schema and funnel checks does not prove the source data is authentic.",
+                "The dataset is synthetic and does not represent an actual ad platform export.",
+                "Attribution, deduplication across devices, timezone and event quality require source-specific validation for REAL data.",
+            ],
+        }
+    except (OSError, csv.Error, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
