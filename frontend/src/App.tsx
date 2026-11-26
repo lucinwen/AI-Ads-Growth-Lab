@@ -238,6 +238,43 @@ function CreativePage({drafts,setDrafts,newHook,setNewHook,notify,workspaceId,pr
       setAgentRunMessage(String((err as Error).message||err));
     } finally {setAgentRunning(false);}
   }
+  const [productionResults,setProductionResults] = useState<Record<string,any>>({});
+  const [productionBusyId,setProductionBusyId] = useState("");
+  const [productionMessage,setProductionMessage] = useState("");
+  useEffect(()=>{
+    if(!drafts.length)return;
+    let active=true;
+    Promise.all(drafts.map(async draft=>{
+      try {
+        const response=await fetch(`${API}/v1/creatives/${draft.id}/production-drafts`);
+        if(!response.ok)return null;
+        const rows=await response.json();
+        return rows.length?[draft.id,rows[0].production] as const:null;
+      }catch{return null;}
+    })).then(items=>{
+      if(!active)return;
+      setProductionResults(old=>{
+        const next={...old};
+        items.forEach(item=>{if(item)next[item[0]]=item[1];});
+        return next;
+      });
+    });
+    return ()=>{active=false;};
+  },[drafts]);
+  async function runProductionAgent(creativeId:string) {
+    setProductionBusyId(creativeId);setProductionMessage("");
+    try {
+      const response=await fetch(`${API}/v1/agents/creative-production/run`,{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({creative_id:creativeId,duration_sec:20,placement:"9:16",language:"en-US"})
+      });
+      const result=await response.json();
+      if(!response.ok)throw new Error(result.detail||"Creative Production Agent failed");
+      setProductionResults(old=>({...old,[creativeId]:result.production}));
+      setProductionMessage(`Storyboard generated for ${creativeId}. It is a draft brief, not a rendered video.`);
+    }catch(err){setProductionMessage(String((err as Error).message||err));}
+    finally{setProductionBusyId("");}
+  }
   const [claims,setClaims] = useState<any[]>([]);
   const [claimText,setClaimText] = useState("");
   const [claimType,setClaimType] = useState("product_attribute");
@@ -287,8 +324,10 @@ function CreativePage({drafts,setDrafts,newHook,setNewHook,notify,workspaceId,pr
     <div className="creative-intro panel"><div className="intro-symbol"><WandSparkles size={24}/></div><div><h3>From product facts to testable creative hypotheses</h3><p>Draft distinct creative routes before generating assets. Every objective claim must be linked to evidence before an asset can enter review.</p></div><Pill tone="amber">Strategy workspace</Pill></div>
     <SectionTitle title="Creative routes" desc="Four differentiated directions for the fictional Luma Dew moisturizer." action={<div className="section-actions"><Pill tone="green">{drafts.length} saved concepts</Pill><button className="button button-primary" onClick={runStrategyAgent} disabled={agentRunning||!workspaceId}><Bot size={15}/>{agentRunning?"Running Agent…":"Generate with Agent"}</button></div>}/>
     {agentRunMessage&&<div className="import-result">{agentRunMessage}</div>}
-    <div className="concept-grid">{drafts.map((d,i)=><div className="concept-card" key={d.id}><div className="concept-top"><span className={`concept-number n-${i}`}>0{i+1}</span><Pill tone={d.status.includes("Needs")?"amber":"neutral"}>{d.status}</Pill></div><div className={`concept-art art-${i}`}><div className="art-bottle"/><span>{["DAILY RITUAL","TEXTURE NOTES","FORMULA / FACTS","REAL-LIFE ROUTINE"][i]}</span></div><div className="concept-body"><span className="concept-angle">{d.angle}</span><h3>{d.title}</h3><blockquote>“{d.hook}”</blockquote><p>{d.hypothesis}</p><div className="concept-foot"><span><Image size={14}/>{d.format}</span><button onClick={()=>notify("Concept detail editor is queued for the next milestone.")}>View brief <ArrowUpRight size={14}/></button></div></div></div>)}</div>
+    <div className="concept-grid">{drafts.map((d,i)=><div className="concept-card" key={d.id}><div className="concept-top"><span className={`concept-number n-${i}`}>0{i+1}</span><Pill tone={d.status.includes("Needs")?"amber":"neutral"}>{d.status}</Pill></div><div className={`concept-art art-${i}`}><div className="art-bottle"/><span>{["DAILY RITUAL","TEXTURE NOTES","FORMULA / FACTS","REAL-LIFE ROUTINE"][i]}</span></div><div className="concept-body"><span className="concept-angle">{d.angle}</span><h3>{d.title}</h3><blockquote>“{d.hook}”</blockquote><p>{d.hypothesis}</p><div className="concept-foot"><span><Image size={14}/>{d.format}</span><button onClick={()=>runProductionAgent(d.id)} disabled={productionBusyId===d.id}><WandSparkles size={13}/>{productionBusyId===d.id?"Building…":"Build storyboard"}</button></div></div></div>)}</div>
     <div className="panel quick-draft"><div><h3><Plus size={17}/> Add a creative hypothesis</h3><p>Save a new hook as a local draft. This does not call a generation model.</p></div><div className="draft-form"><input value={newHook} onChange={e=>setNewHook(e.target.value)} placeholder="Write an English hook or creative angle…"/><button className="button button-primary" disabled={!newHook.trim() || !workspaceId} onClick={saveCreativeDraft}><Plus size={15}/> Save draft</button></div></div>
+    {productionMessage&&<div className="import-result">{productionMessage}</div>}
+    {Object.entries(productionResults).length>0&&<div className="panel production-results"><div className="panel-head"><div><h3>Generated production briefs</h3><p>AI-generated scripts and storyboards; not rendered image/video assets.</p></div><Pill tone="amber">Drafts</Pill></div>{Object.entries(productionResults).map(([creativeId,result]:[string,any])=><div className="production-result" key={creativeId}><strong>{result.title} <small>{creativeId}</small></strong><p>{result.hook}</p><div className="production-scenes">{result.scenes.map((scene:any)=><div key={scene.scene_number}><b>0{scene.scene_number}</b><span>{scene.duration_sec}s</span><p>{scene.visual_description}</p><small>{scene.camera_direction}</small></div>)}</div></div>)}</div>}
     <div className="panel claim-panel">
       <div className="panel-head"><div><h3>Product claim registry</h3><p>Only evidence-backed claims may move into approved ad copy.</p></div><Pill tone="amber">Evidence gate</Pill></div>
       <div className="claim-form"><input value={claimText} onChange={e=>setClaimText(e.target.value)} placeholder="Add a product statement to review…"/><select value={claimType} onChange={e=>setClaimType(e.target.value)}><option value="product_attribute">Product attribute</option><option value="sensory">Sensory / feel</option><option value="performance">Performance</option><option value="clinical">Clinical / therapeutic</option></select><button className="button button-primary" disabled={!claimText.trim()} onClick={saveClaim}><Plus size={14}/> Add unverified claim</button></div>
