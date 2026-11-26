@@ -1,7 +1,7 @@
 # Portfolio Case Study — AI Ads Growth Lab
 
 ## One-line summary
-Designed and implemented an AI-assisted creative strategy and advertising measurement workspace for a fictional US skincare brand, connecting persistent product/claim data, creative hypotheses, human review, experiment configuration, deterministic metric analysis, and configurable Strategy and Production Agents.
+Designed and implemented an AI-assisted creative strategy and advertising measurement workspace for a fictional US skincare brand, connecting persistent product/claim data, creative hypotheses, human review, experiment configuration, deterministic metric analysis, and configurable Strategy and Production Agents, plus an image/video asset production workspace.
 
 ## Problem framing
 AIGC can increase the supply of advertising creatives, but production volume alone does not prove business value. Teams need a traceable way to connect:
@@ -39,7 +39,7 @@ SIMULATED and REAL data modes are isolated. The bundled dataset is synthetic and
 No automatic ad publishing, budget changes or campaign operations are implemented. Agent-generated concepts are drafts and require human creative/compliance review.
 
 ## Implemented product
-- Responsive React + TypeScript dashboard.
+- Responsive React + TypeScript dashboard with a dedicated Creative Production Studio.
 - FastAPI backend.
 - SQLite local persistence for workspace, product, claim, creative, asset version, experiment, variant, review, AgentRun and audit records.
 - Seeded fictional demo workspace and four starter creative hypotheses.
@@ -49,6 +49,9 @@ No automatic ad publishing, budget changes or campaign operations are implemente
 - Asset versions default to PENDING and have a separate human-review endpoint.
 - Configurable Creative Strategy Agent uses an OpenAI-compatible chat-completions endpoint, validates structured output and persists returned concepts as drafts.
 - Configurable Creative Production Agent generates versioned scripts, storyboards, camera directions and asset prompts from a saved creative concept.
+- OpenAI Images API integration generates actual image files and stores them locally with prompt/model metadata.
+- Optional Replicate integration starts asynchronous video generation, polls status and retrieves completed video files.
+- Media library supports upload, preview, side-by-side comparison, human review and ZIP export with manifest.
 - AgentRun records retain status, model, input/output references, latency and error information.
 - Dashboard aggregates the bundled synthetic dataset by date, creative and funnel stage.
 - CSV validation endpoint rejects data-mode mismatch.
@@ -90,7 +93,7 @@ All 84 daily media records, impressions, clicks, purchases, spend, attributed re
 ### Not yet implemented
 - PostgreSQL runtime and migrations (SQLite is the current local adapter).
 - Full multi-agent orchestrator and specialist execution beyond Strategy and Production.
-- Image/video generation pipeline and asset storage.
+- Production-grade provider-specific video adapters, generation queue/retries and cost telemetry.
 - Full claim-review evidence UI and regulatory workflow.
 - Read-only TikTok/Meta account connectors.
 - Real randomized A/B tests, robust power analysis against actual traffic, sequential-testing controls, multiple-comparison correction, incrementality measurement, and actual campaign results.
