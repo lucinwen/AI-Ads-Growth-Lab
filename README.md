@@ -10,7 +10,7 @@ AI-powered creative production and growth analytics workspace for the US beauty 
 - Responsive React + TypeScript dashboard with Overview, Creative Studio, Experiments, Growth Insights, and Agent Activity views.
 - FastAPI health, deterministic metric aggregation, CSV validation, demo overview, and persistent workspace APIs.
 - SQLite local persistence for workspaces, products, claims, creatives, asset versions, experiments, variants, AgentRun traces, reviews, and audit events.
-- Configurable Creative Strategy and Creative Production Agents using an OpenAI-compatible chat-completions endpoint; structured concepts, scripts, storyboards and prompts are validated and persisted as human-reviewable drafts.
+- Configurable Creative Strategy and Creative Production Agents using an OpenAI-compatible chat-completions endpoint; structured concepts, scripts, storyboards and prompts are validated and persisted as human-reviewable drafts.\n- Statistical experiment comparison API and Growth Insights UI with CTR/CVR two-proportion testing, confidence intervals, sample sufficiency and approximate MDE planning.
 - Idempotently seeded fictional Luma Dew demo workspace; Creative Studio saves new hypotheses to the database.
 - Demo overview aggregation by creative, date, and funnel stage.
 - Explicit SIMULATED / REAL data-mode isolation in aggregation and CSV validation.
@@ -71,7 +71,7 @@ npm run dev
 ## API endpoints
 
 - `GET /health`
-- `GET /v1/demo/overview` — aggregated demo data for dashboard views
+- `GET /v1/demo/overview` — aggregated demo data for dashboard views\n- `GET /v1/demo/experiment/compare` — synthetic creative-family significance comparison
 - `POST /v1/agents/creative-strategy/run` — generate and persist structured creative concept drafts (requires provider configuration)
 - `GET /v1/workspaces/{workspace_id}/agent-runs` — inspect persisted AgentRun traces
 - `POST /v1/metrics/aggregate` — aggregate validated metric rows
@@ -92,8 +92,8 @@ npm run dev
 - Frontend: React + TypeScript + Vite
 - Backend: Python + FastAPI
 - Database: PostgreSQL
-- Analytics: deterministic Python metric engine; statistical modules to follow
-- Tests: Pytest + frontend production build
+- Analytics: deterministic Python metric engine and two-proportion experiment comparison (synthetic demo only)
+- Tests: 23 Pytest tests + frontend production build + Docker Compose config validation
 - Local development: Docker Compose
 
 ## Repository map
