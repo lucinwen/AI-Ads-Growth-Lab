@@ -312,3 +312,14 @@ def test_demo_experiment_comparison_endpoint():
 def test_demo_experiment_comparison_rejects_same_family():
     response = client.get("/v1/demo/experiment/compare?control_family=C-A&treatment_family=C-A")
     assert response.status_code == 422
+
+
+def test_demo_data_quality_audit_passes_seed_dataset():
+    response = client.get("/v1/demo/data-quality")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "PASS"
+    assert payload["row_count"] == 84
+    assert payload["unique_grain_count"] == 84
+    assert payload["issue_count"] == 0
+    assert payload["data_mode"] == "SIMULATED"
