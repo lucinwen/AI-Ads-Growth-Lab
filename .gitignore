@@ -12,3 +12,7 @@ dist/
 build/
 coverage/
 *.log
+
+# Local runtime database
+*.sqlite3
+runtime-data/
