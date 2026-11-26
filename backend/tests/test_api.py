@@ -53,3 +53,15 @@ def test_csv_mode_mismatch_rejected():
         files={"file": ("metrics.csv", csv_body, "text/csv")}
     )
     assert response.status_code == 422
+
+
+def test_demo_overview_endpoint():
+    response = client.get("/v1/demo/overview")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["data_mode"] == "SIMULATED"
+    assert payload["row_count"] == 84
+    assert payload["creative_count"] == 12
+    assert len(payload["daily"]) == 7
+    assert len(payload["funnel"]) == 5
+    assert "synthetic" in payload["limitations"][0].lower()
