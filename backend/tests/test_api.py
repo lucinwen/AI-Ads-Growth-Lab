@@ -142,6 +142,11 @@ def test_workspace_product_claim_creative_and_experiment_persistence():
         "creative_id": creative["id"], "allocation_pct": 100, "role": "TREATMENT"
     })
     assert variant_response.status_code == 201
+    variants = client.get("/v1/experiments/" + experiment["id"] + "/variants")
+    assert variants.status_code == 200
+    assert len(variants.json()) == 1
+    saved_experiments = client.get("/v1/workspaces/" + workspace_id + "/experiments")
+    assert saved_experiments.json()[0]["variant_count"] == 1
 
     listed = client.get(f"/v1/workspaces/{workspace_id}/creatives")
     assert listed.status_code == 200
