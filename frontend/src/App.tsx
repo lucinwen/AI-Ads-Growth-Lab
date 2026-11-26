@@ -213,7 +213,7 @@ function ChartSkeleton(){return <div className="skeleton-chart"><div/><div/><div
 
 function CreativePage({drafts,setDrafts,newHook,setNewHook,notify,workspaceId,productId}:{
   drafts:{id:string;title:string;angle:string;hook:string;hypothesis:string;format:string;status:string}[];
-  setDrafts:(v:any)=>void;newHook:string;setNewHook:(v:string)=>void;notify:(s:string)=>void;
+  setDrafts:(v:any)=>void;newHook:string;setNewHook:(v:string)=>void;notify:(s:string)=>void;workspaceId:string;productId:string;
 }) {
   async function saveCreativeDraft() {
     if (!newHook.trim() || !workspaceId || !productId) return;
