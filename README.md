@@ -16,7 +16,7 @@ AI-powered creative production and growth analytics workspace for the US beauty 
 - Explicit SIMULATED / REAL data-mode isolation in aggregation and CSV validation.
 - 84 synthetic daily records covering 12 creative variants across 7 dates.
 - Agent role specifications, product requirements, experiment plan, data dictionary, PostgreSQL schema draft, and portfolio evidence standards.
-- GitHub Actions checks for backend tests and frontend production build.
+- GitHub Actions checks for backend tests, frontend production build, and Docker Compose configuration.
 
 ### Not implemented yet
 - PostgreSQL integration and migrations; SQLite is currently the local persistence adapter.
