@@ -13,6 +13,7 @@ The current local runtime uses SQLite for persistence. The PostgreSQL schema is 
 - `POST /v1/workspaces` / `GET /v1/workspaces`
 - `POST /v1/products` / `GET /v1/workspaces/{workspace_id}/products`
 - `POST /v1/claims` / `GET /v1/products/{product_id}/claims`
+- `POST /v1/claims/{claim_id}/review` / `GET /v1/claims/{claim_id}/reviews`
 - `POST /v1/creatives` / `GET /v1/workspaces/{workspace_id}/creatives`
 - `POST /v1/assets/versions` / `GET /v1/creatives/{creative_id}/assets`
 - `POST /v1/assets/versions/{asset_version_id}/review` / `GET /v1/assets/versions/{asset_version_id}/reviews`
