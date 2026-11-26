@@ -65,3 +65,27 @@ def test_demo_overview_endpoint():
     assert len(payload["daily"]) == 7
     assert len(payload["funnel"]) == 5
     assert "synthetic" in payload["limitations"][0].lower()
+
+
+def test_demo_overview_endpoint():
+    response = client.get("/v1/demo/overview")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["data_mode"] == "SIMULATED"
+    assert payload["row_count"] == 84
+    assert payload["creative_count"] == 12
+    assert len(payload["daily"]) == 7
+    assert len(payload["funnel"]) == 5
+    assert "synthetic" in payload["limitations"][0].lower()
+
+
+def test_demo_overview_is_cors_accessible_from_local_frontend():
+    response = client.options(
+        "/v1/demo/overview",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
