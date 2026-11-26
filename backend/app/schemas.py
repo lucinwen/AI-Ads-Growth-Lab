@@ -55,7 +55,14 @@ class AssetVersionCreate(StrictModel):
     prompt_text: str | None = None
     model_name: str | None = None
     file_hash: str | None = None
-    approval_status: Literal["PENDING", "APPROVED", "REJECTED", "NEEDS_CHANGES", "BLOCKED"] = "PENDING"
+
+
+
+class AssetReviewCreate(StrictModel):
+    reviewer_id: str = Field(min_length=2, max_length=120)
+    decision: Literal["APPROVED", "REJECTED", "NEEDS_CHANGES", "BLOCKED"]
+    reason: str = Field(min_length=3, max_length=1000)
+    findings: list[dict] = Field(default_factory=list)
 
 
 class ExperimentCreate(StrictModel):
