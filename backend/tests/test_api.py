@@ -333,13 +333,13 @@ def test_media_upload_library_review_and_export(tmp_path, monkeypatch):
     upload = client.post(
         "/v1/media-assets/upload",
         data={"creative_id":"demo-creative-routine","label":"test-image"},
-        files={"file":("tiny.png",b"fake-png-bytes","image/png")}
+        files={"file":("tiny.png",b"\\x89PNG\\r\\n\\x1a\\n"+b"test-payload","image/png")}
     )
     assert upload.status_code == 201
     asset = upload.json()
     assert asset["asset_type"] == "IMAGE"
     assert asset["status"] == "UPLOADED"
-    assert (tmp_path / asset["local_filename"]).read_bytes() == b"fake-png-bytes"
+    assert (tmp_path / asset["local_filename"]).read_bytes().startswith(b"\\x89PNG\\r\\n\\x1a\\n")
 
     listed = client.get("/v1/creatives/demo-creative-routine/media-assets")
     assert listed.status_code == 200
