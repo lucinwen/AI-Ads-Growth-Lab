@@ -20,7 +20,6 @@ AI-powered creative production and growth analytics workspace for the US beauty 
 
 ### Not implemented yet
 - PostgreSQL integration and migrations; SQLite is currently the local persistence adapter.
-- PostgreSQL integration and migrations; SQLite is currently the local persistence adapter.
 - Multi-agent orchestration and specialist execution beyond the first Creative Strategy Agent.
 - Real asset generation, upload, and storage pipeline.
 - Real ad account connectors or live campaign operations.
