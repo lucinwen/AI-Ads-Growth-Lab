@@ -158,7 +158,7 @@ export default function App() {
         {page === "creative" && <CreativePage drafts={drafts} setDrafts={setDrafts} newHook={newHook} setNewHook={setNewHook} notify={notify} workspaceId={overview?.workspace_id || ""} productId={overview?.product_id || ""}/>}
         {page === "experiments" && <ExperimentsPage overview={overview} loading={loading}/>}
         {page === "insights" && <InsightsPage overview={overview} loading={loading}/>}
-        {page === "agents" && <AgentsPage/>}
+        {page === "agents" && <AgentsPage workspaceId={overview?.workspace_id || ""}/>}
         <footer className="footer"><span>AI Ads Growth Lab <b>V1.1</b></span><span>SIMULATED DATA · NOT LIVE MEDIA PERFORMANCE</span></footer>
       </div>
     </main>
@@ -391,7 +391,16 @@ function InsightsPage({overview,loading}:{overview:Overview|null;loading:boolean
   </div>;
 }
 
-function AgentsPage() {
+function AgentsPage({workspaceId}:{workspaceId:string}) {
+  const [runs,setRuns]=useState<any[]>([]);
+  const [runError,setRunError]=useState("");
+  useEffect(()=>{
+    if(!workspaceId)return;
+    fetch(`${API}/v1/workspaces/${workspaceId}/agent-runs`)
+      .then(r=>{if(!r.ok)throw new Error("Could not load Agent run history");return r.json();})
+      .then(setRuns)
+      .catch(err=>setRunError(String(err.message||err)));
+  },[workspaceId]);
   const agents=[
     ["Strategy Agent","Creative angles, hooks and testable hypotheses","SPEC DEFINED","blue"],
     ["Creative Production Agent","Scripts, storyboards, prompts and asset manifests","SPEC DEFINED","blue"],
@@ -404,6 +413,10 @@ function AgentsPage() {
     <div className="agent-hero panel"><div className="agent-orb"><Bot size={24}/></div><div><Pill tone="amber">Orchestration not connected yet</Pill><h2>Specialist agents, one auditable workflow.</h2><p>Agent roles and Skills are specified in the repository. The current running slice includes deterministic analytics; LLM execution, tool routing and persistent run logs are future implementation work.</p></div></div>
     <SectionTitle title="Agent registry" desc="Capability specifications and implementation status — not simulated run history."/>
     <div className="agent-grid">{agents.map(([name,desc,status,tone])=><div className="panel agent-card" key={name}><div className="agent-card-icon"><Bot size={18}/></div><div><h3>{name}</h3><p>{desc}</p></div><Pill tone={tone as any}>{status}</Pill></div>)}</div>
+    <div className="panel"><SectionTitle title="Recent execution records" desc="Persisted AgentRun records. Failed runs are visible and traceable; no fake activity is displayed."/>
+      {runError&&<div className="import-result">{runError}</div>}
+      {runs.length?<div className="run-list">{runs.map((run:any)=><div className="run-row" key={run.id}><div className="run-icon"><Bot size={16}/></div><div className="run-copy"><strong>{run.agent_name}</strong><span>{run.status} · {run.model_name||"provider not selected"} · {run.latency_ms==null?"—":run.latency_ms+" ms"}</span><small>{run.error||("Run ID "+run.id.slice(0,12))}</small></div><Pill tone={run.status==="SUCCEEDED"?"green":run.status==="FAILED"?"amber":"blue"}>{run.status}</Pill></div>)}</div>:<div className="empty-state-inline">No Agent runs yet. Configure an OpenAI-compatible provider and run Creative Strategy from Creative Studio.</div>}
+    </div>
     <div className="panel"><SectionTitle title="Workflow governance" desc="The system must keep human decisions and evidence visible."/><div className="governance-grid"><div><ShieldCheck size={18}/><strong>Claim evidence</strong><span>Unverified objective claims cannot pass to test-ready.</span></div><div><FileCheck2 size={18}/><strong>Human approval</strong><span>Creative, compliance and campaign decisions remain reviewable.</span></div><div><Activity size={18}/><strong>Traceability</strong><span>Inputs, versions, tool calls and outputs will be linked to each run.</span></div></div></div>
   </div>;
 }
