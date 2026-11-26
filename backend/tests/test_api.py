@@ -119,6 +119,19 @@ def test_workspace_product_claim_creative_and_experiment_persistence():
     })
     assert claim_response.status_code == 201
     assert claim_response.json()["status"] == "UNVERIFIED"
+    claim_id = claim_response.json()["id"]
+    no_evidence = client.post("/v1/claims/" + claim_id + "/review", json={
+        "reviewer_id":"human-reviewer","decision":"VERIFIED","evidence_refs":[],
+        "reason":"Cannot verify without substantiation."
+    })
+    assert no_evidence.status_code == 422
+    reviewed = client.post("/v1/claims/" + claim_id + "/review", json={
+        "reviewer_id":"human-reviewer","decision":"VERIFIED",
+        "evidence_refs":["evidence://product-spec-v1"],
+        "reason":"Checked against the supplied product specification."
+    })
+    assert reviewed.status_code == 201
+    assert client.get("/v1/products/" + product["id"] + "/claims").json()[0]["status"] == "VERIFIED"
 
     creative_response = client.post("/v1/creatives", json={
         "workspace_id": workspace_id, "product_id": product["id"],
