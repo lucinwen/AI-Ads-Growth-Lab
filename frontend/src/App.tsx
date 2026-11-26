@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  Activity, ArrowDownRight, ArrowUpRight, BarChart3, Bell, Bot, Check,
+  Activity, ArrowUpRight, BarChart3, Bell, Bot, Check,
   ChevronDown, CircleHelp, Clock3, CloudUpload, FileCheck2, FlaskConical,
-  Gauge, Image, LayoutDashboard, Layers3, Menu, MessageSquareText,
+  Gauge, Image, LayoutDashboard, Layers3, Menu,
   MoreHorizontal, Plus, Search, ShieldCheck, Sparkles, Target, WandSparkles,
   X, Zap
 } from "lucide-react";
 import {
   Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
-  BarChart, Bar, Cell
 } from "recharts";
 
 type MetricSet = {
@@ -194,7 +193,7 @@ function OverviewPage({overview,loading,onImport,importing,importResult,onRefres
       <div className="panel funnel-panel">
         <div className="panel-head"><div><h3>Conversion funnel</h3><p>From impression to purchase</p></div><MoreHorizontal size={18}/></div>
         {overview ? <div className="funnel-list">{overview.funnel.map((f,i)=>{
-          const max=overview.funnel[0]?.value||1; const widths=[100,Math.max(5,f.value/max*100)];
+          const max=overview.funnel[0]?.value||1;
           return <div className="funnel-row" key={f.stage}><div className="funnel-meta"><span>{f.stage}</span><strong>{number(f.value)}</strong></div><div className="funnel-track"><div style={{width:`${Math.max(3,f.value/max*100)}%`}} className={`funnel-fill funnel-${i}`}/></div>{i>0&&<div className="funnel-rate">{percent(f.value/(overview.funnel[i-1]?.value||1))} from previous step</div>}</div>;
         })}</div> : <ChartSkeleton/>}
         <div className="funnel-note"><ShieldCheck size={15}/> Rates use aggregated event counts. Attribution definitions remain demo assumptions.</div>
