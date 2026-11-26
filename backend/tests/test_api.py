@@ -386,3 +386,62 @@ def test_video_generation_requires_replicate_configuration(monkeypatch):
     })
     assert response.status_code == 503
     assert "REPLICATE_API_TOKEN" in response.json()["detail"]
+
+
+def test_image_generation_success_persists_asset_metadata(tmp_path, monkeypatch):
+    import app.main as main_module
+    main_module.media.MEDIA_ROOT = tmp_path
+    main_module.media.PUBLIC_BASE = "http://testserver"
+
+    async def fake_image(prompt, size, quality):
+        filename = "image-generated-test.png"
+        (tmp_path / filename).write_bytes(b"\\x89PNG\\r\\n\\x1a\\nmock-image")
+        return {
+            "provider":"openai-compatible-images","model":"test-image-model",
+            "asset_id":"provider-image-id","asset_uri":"http://testserver/media/"+filename,
+            "content_type":"image/png","bytes":18
+        }
+
+    monkeypatch.setattr(main_module.media,"generate_image",fake_image)
+    response=client.post("/v1/media-assets/generate-image",json={
+        "creative_id":"demo-creative-routine",
+        "prompt":"Premium moisturizer hero image, studio softbox lighting, cream background, macro product photography.",
+        "size":"1024x1536","quality":"high","variation_group":"test-set-a"
+    })
+    assert response.status_code==201
+    asset=response.json()
+    assert asset["asset_type"]=="IMAGE"
+    assert asset["provider"]=="openai-compatible-images"
+    assert asset["model_name"]=="test-image-model"
+    assert asset["status"]=="GENERATED"
+    assert asset["variation_group"]=="test-set-a"
+    assert (tmp_path/"image-generated-test.png").exists()
+
+
+def test_video_job_can_be_started_refreshed_and_saved(tmp_path, monkeypatch):
+    import app.main as main_module
+    main_module.media.MEDIA_ROOT=tmp_path
+    main_module.media.PUBLIC_BASE="http://testserver"
+
+    async def fake_start(prompt,aspect_ratio,duration):
+        return {"provider":"replicate","model":"test/video","prediction_id":"pred-test-123","status":"starting"}
+    async def fake_poll(prediction_id):
+        filename="video-generated-test.mp4"
+        (tmp_path/filename).write_bytes(b"\\x00\\x00\\x00\\x18ftypisom-mock")
+        return {"prediction_id":prediction_id,"status":"succeeded","output_url":"https://provider.invalid/video.mp4","asset_uri":"http://testserver/media/"+filename,"error":None}
+    monkeypatch.setattr(main_module.media,"start_video",fake_start)
+    monkeypatch.setattr(main_module.media,"poll_video",fake_poll)
+
+    started=client.post("/v1/media-assets/generate-video",json={
+        "creative_id":"demo-creative-routine",
+        "prompt":"Vertical premium moisturizer product film, slow dolly movement, soft studio lighting.",
+        "aspect_ratio":"9:16","duration_sec":5
+    })
+    assert started.status_code==202
+    asset_id=started.json()["id"]
+    assert started.json()["status"]=="GENERATING"
+
+    refreshed=client.post(f"/v1/media-assets/{asset_id}/refresh")
+    assert refreshed.status_code==200
+    assert refreshed.json()["status"]=="GENERATED"
+    assert refreshed.json()["asset_uri"].endswith("video-generated-test.mp4")
