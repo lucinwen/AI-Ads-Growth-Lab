@@ -6,11 +6,19 @@ from typing import Literal
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, ConfigDict
 
 from .metrics import MetricRow, aggregate_metrics
 
-app = FastAPI(title="AI Ads Growth Lab API", version="0.1.0")
+app = FastAPI(title="AI Ads Growth Lab API", version="0.2.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
 
 
 class MetricInput(BaseModel):
