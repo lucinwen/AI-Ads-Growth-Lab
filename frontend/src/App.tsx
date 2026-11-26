@@ -89,8 +89,6 @@ export default function App() {
     return () => { active = false; };
   }, [refresh]);
 
-  const s = overview?.summary;
-
   const notify = (message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 3000);
