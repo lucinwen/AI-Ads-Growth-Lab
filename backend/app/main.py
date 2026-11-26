@@ -21,9 +21,6 @@ app = FastAPI(title="AI Ads Growth Lab API", version="0.4.0")
 storage.init_db()
 storage.seed_demo_workspace()
 
-@app.on_event("startup")
-def initialize_storage():
-    storage.init_db()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
