@@ -16,3 +16,6 @@ coverage/
 # Local runtime database
 *.sqlite3
 runtime-data/
+
+# Generated local media files
+media/
