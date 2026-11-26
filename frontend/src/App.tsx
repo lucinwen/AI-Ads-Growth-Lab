@@ -412,6 +412,24 @@ function InsightsPage({overview,loading}:{overview:Overview|null;loading:boolean
   const bestCtr=[...creatives].sort((a,b)=>(b.metrics.ctr||0)-(a.metrics.ctr||0))[0];
   const bestCvr=[...creatives].sort((a,b)=>(b.metrics.cvr_click_to_purchase||0)-(a.metrics.cvr_click_to_purchase||0))[0];
   const bestRoas=[...creatives].sort((a,b)=>(b.metrics.roas||0)-(a.metrics.roas||0))[0];
+  const [control,setControl]=useState("C-A");
+  const [treatment,setTreatment]=useState("C-B");
+  const [metric,setMetric]=useState("CTR");
+  const [comparison,setComparison]=useState<any>(null);
+  const [compareLoading,setCompareLoading]=useState(false);
+  const [compareError,setCompareError]=useState("");
+  useEffect(()=>{
+    let active=true;
+    setCompareLoading(true);setCompareError("");
+    fetch(`${API}/v1/demo/experiment/compare?control_family=${control}&treatment_family=${treatment}&metric=${metric}&mde_absolute=0.005`)
+      .then(r=>{if(!r.ok)throw new Error("Comparison could not be calculated");return r.json();})
+      .then(data=>{if(active)setComparison(data);})
+      .catch(err=>{if(active)setCompareError(String(err.message||err));})
+      .finally(()=>{if(active)setCompareLoading(false);});
+    return ()=>{active=false;};
+  },[control,treatment,metric]);
+  const analysis=comparison?.analysis;
+  const decisionTone=analysis?.decision==="PROMISING"?"green":analysis?.decision==="UNDERPERFORMING"?"amber":"blue";
   return <div className="page-stack">
     <div className="insight-hero"><div className="insight-orb"><Sparkles size={22}/></div><div><span>ANALYSIS MODE · SIMULATED</span><h2>Signals, not verdicts.</h2><p>These observations summarize the bundled synthetic dataset. They are useful for testing the analysis workflow, not for claiming actual ad performance.</p></div></div>
     <SectionTitle title="Descriptive signals" desc="Top variants by separate metric dimensions. These are not statistically validated winners."/>
@@ -419,6 +437,23 @@ function InsightsPage({overview,loading}:{overview:Overview|null;loading:boolean
       <div className="panel signal-card"><span>HIGHEST SYNTHETIC CTR</span><strong>{loading?"…":bestCtr?.creative_id||"—"}</strong><p>{bestCtr?conceptName[bestCtr.concept]:"Awaiting data"}</p><b>{percent(bestCtr?.metrics.ctr)}</b><small>Attention proxy · not a causal result</small></div>
       <div className="panel signal-card"><span>HIGHEST SYNTHETIC CVR</span><strong>{loading?"…":bestCvr?.creative_id||"—"}</strong><p>{bestCvr?conceptName[bestCvr.concept]:"Awaiting data"}</p><b>{percent(bestCvr?.metrics.cvr_click_to_purchase)}</b><small>Click-to-purchase · attribution assumption</small></div>
       <div className="panel signal-card"><span>HIGHEST SYNTHETIC ROAS</span><strong>{loading?"…":bestRoas?.creative_id||"—"}</strong><p>{bestRoas?conceptName[bestRoas.concept]:"Awaiting data"}</p><b>{bestRoas?.metrics.roas?.toFixed(2)||"—"}x</b><small>Attributed revenue / spend · not ROI</small></div>
+    </div>
+    <div className="panel significance-panel">
+      <div className="panel-head"><div><h3>Experiment comparison</h3><p>Two-proportion z-test · Wilson confidence intervals · approximate sample planning</p></div><Pill tone="amber">Synthetic only</Pill></div>
+      <div className="comparison-controls">
+        <label>Control family<select value={control} onChange={e=>setControl(e.target.value)}>{["C-A","C-B","C-C","C-D"].map(v=><option key={v} value={v}>{v} · {conceptName[v]}</option>)}</select></label>
+        <label>Treatment family<select value={treatment} onChange={e=>setTreatment(e.target.value)}>{["C-A","C-B","C-C","C-D"].filter(v=>v!==control).map(v=><option key={v} value={v}>{v} · {conceptName[v]}</option>)}</select></label>
+        <label>Primary metric<select value={metric} onChange={e=>setMetric(e.target.value)}><option value="CTR">CTR</option><option value="CVR">Click-to-purchase CVR</option></select></label>
+      </div>
+      {compareError&&<div className="import-result">{compareError}</div>}
+      {compareLoading?<div className="empty-state-inline">Calculating comparison…</div>:analysis&&<div className="comparison-results">
+        <div className="comparison-decision"><span>STATISTICAL SCREEN</span><Pill tone={decisionTone as any}>{analysis.decision.replaceAll("_"," ")}</Pill><strong>p = {analysis.p_value.toFixed(4)}</strong><small>α = {analysis.alpha.toFixed(2)} · two-sided</small></div>
+        <div className="comparison-arm"><span>{control} · Control</span><strong>{percent(analysis.control.rate)}</strong><small>{number(analysis.control.successes)} / {number(analysis.control.trials)}</small><small>Wilson 95% CI: {percent(analysis.control.wilson_95_ci[0])} – {percent(analysis.control.wilson_95_ci[1])}</small></div>
+        <div className="comparison-arm"><span>{treatment} · Treatment</span><strong>{percent(analysis.treatment.rate)}</strong><small>{number(analysis.treatment.successes)} / {number(analysis.treatment.trials)}</small><small>Wilson 95% CI: {percent(analysis.treatment.wilson_95_ci[0])} – {percent(analysis.treatment.wilson_95_ci[1])}</small></div>
+        <div className="comparison-lift"><span>Absolute difference</span><strong>{analysis.absolute_difference>=0?"+":""}{(analysis.absolute_difference*100).toFixed(2)} pp</strong><span>Relative lift</span><strong>{analysis.relative_lift==null?"—":(analysis.relative_lift*100).toFixed(1)+"%"}</strong></div>
+      </div>}
+      {analysis&&<div className="sample-planning"><div><span>APPROX. REQUIRED SAMPLE / ARM</span><strong>{analysis.planning.approx_required_sample_per_arm_80pct_power?number(analysis.planning.approx_required_sample_per_arm_80pct_power):"N/A"}</strong><small>80% power · 5% alpha · MDE 0.5 pp</small></div><div><span>DIFFERENCE 95% CI</span><strong>{(analysis.difference_95_ci[0]*100).toFixed(2)} to {(analysis.difference_95_ci[1]*100).toFixed(2)} pp</strong><small>Unpooled normal approximation</small></div></div>}
+      <div className="notice-box"><ShieldCheck size={16}/><span>These are synthetic, aggregated records—not a randomized user-level experiment. Statistical significance here is only a software demonstration and cannot prove causal lift. The sample-size estimate is approximate.</span></div>
     </div>
     <div className="panel"><SectionTitle title="Recommended next checks" desc="Hypotheses to investigate before changing creative or media strategy."/>
       <div className="recommendation-list">
