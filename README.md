@@ -9,7 +9,8 @@ AI-powered creative production and growth analytics workspace for the US beauty 
 ### Implemented
 - Responsive React + TypeScript dashboard with Overview, Creative Studio, Experiments, Growth Insights, and Agent Activity views.
 - FastAPI health, deterministic metric aggregation, CSV validation, demo overview, and persistent workspace APIs.
-- SQLite local persistence for workspaces, products, claims, creatives, asset versions, experiments, variants, and audit events.
+- SQLite local persistence for workspaces, products, claims, creatives, asset versions, experiments, variants, AgentRun traces, reviews, and audit events.
+- Configurable Creative Strategy Agent using an OpenAI-compatible chat-completions endpoint; structured outputs are validated and saved as human-reviewable drafts.
 - Idempotently seeded fictional Luma Dew demo workspace; Creative Studio saves new hypotheses to the database.
 - Demo overview aggregation by creative, date, and funnel stage.
 - Explicit SIMULATED / REAL data-mode isolation in aggregation and CSV validation.
@@ -20,7 +21,7 @@ AI-powered creative production and growth analytics workspace for the US beauty 
 ### Not implemented yet
 - PostgreSQL integration and migrations; SQLite is currently the local persistence adapter.
 - PostgreSQL integration and migrations; SQLite is currently the local persistence adapter.
-- Actual LLM-backed Agent execution, tool routing, and persisted AgentRun traces.
+- Multi-agent orchestration and specialist execution beyond the first Creative Strategy Agent.
 - Real asset generation, upload, and storage pipeline.
 - Real ad account connectors or live campaign operations.
 - Real campaign results or causal growth evidence.
@@ -28,6 +29,10 @@ AI-powered creative production and growth analytics workspace for the US beauty 
 ## Quick start
 
 Requires Docker Compose, or Python 3.11+ and Node.js 20+.
+
+### Configure optional Creative Strategy Agent
+
+Copy `.env.example` to `.env` and add your own `OPENAI_API_KEY`. You may also change `OPENAI_BASE_URL` and `OPENAI_MODEL`. The key is not committed or stored in the database.
 
 ### Docker Compose (recommended)
 
@@ -68,6 +73,8 @@ npm run dev
 
 - `GET /health`
 - `GET /v1/demo/overview` — aggregated demo data for dashboard views
+- `POST /v1/agents/creative-strategy/run` — generate and persist structured creative concept drafts (requires provider configuration)
+- `GET /v1/workspaces/{workspace_id}/agent-runs` — inspect persisted AgentRun traces
 - `POST /v1/metrics/aggregate` — aggregate validated metric rows
 - `POST /v1/import/csv/validate?data_mode=SIMULATED` — validate a CSV upload and return aggregate metrics
 
