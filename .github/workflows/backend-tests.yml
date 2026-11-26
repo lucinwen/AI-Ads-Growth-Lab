@@ -14,6 +14,10 @@ on:
       - "backend/**"
       - "frontend/**"
       - ".github/workflows/backend-tests.yml"
+      - "docker-compose.yml"
+      - "backend/Dockerfile"
+      - "frontend/Dockerfile"
+      - ".env.example"
 
 jobs:
   backend-tests:
