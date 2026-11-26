@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
+import os
 from typing import Literal
 from pathlib import Path
 
@@ -99,7 +100,7 @@ async def validate_csv(file: UploadFile = File(...), data_mode: Literal["SIMULAT
 @app.get("/v1/demo/overview")
 def demo_overview():
     """Return the bundled synthetic experiment for the interactive portfolio demo."""
-    dataset = Path(__file__).resolve().parents[2] / "data" / "synthetic_daily_metrics.csv"
+    dataset = Path(os.getenv("AI_ADS_DEMO_DATA_PATH", str(Path(__file__).resolve().parents[2] / "data" / "synthetic_daily_metrics.csv")) )
     if not dataset.exists():
         raise HTTPException(status_code=503, detail="Demo dataset is not available")
 
