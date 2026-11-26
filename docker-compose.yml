@@ -7,13 +7,19 @@ services:
     environment:
       AI_ADS_DEMO_DATA_PATH: /app/data/synthetic_daily_metrics.csv
       AI_ADS_DB_PATH: /app/runtime-data/growthlab.sqlite3
+      AI_ADS_MEDIA_PATH: /app/media
+      AI_ADS_PUBLIC_BASE_URL: http://localhost:8000
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+      OPENAI_IMAGE_MODEL: ${OPENAI_IMAGE_MODEL:-gpt-image-1}
+      REPLICATE_API_TOKEN: ${REPLICATE_API_TOKEN:-}
+      REPLICATE_MODEL: ${REPLICATE_MODEL:-}
     volumes:
       - ./backend/app:/app/app
       - ./data:/app/data:ro
       - ./runtime-data:/app/runtime-data
+      - ./media:/app/media
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s
